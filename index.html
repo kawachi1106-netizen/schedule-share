@@ -959,10 +959,10 @@
         const c = getColor(i);
         const checked = selectedIds.includes(m.id);
         return `
-          <label class="member-checkbox-item ${checked ? 'checked' : ''}"
-            style="border-color:${c.border};color:${c.text};background:${checked ? c.bg : '#fff'}"
-            onclick="toggleMemberCheck(this,'${m.id}')">
-            <input type="checkbox" value="${m.id}" ${checked ? 'checked' : ''}>
+          <label class="member-checkbox-item ${checked ? 'checked' : ''}" id="mcb-${m.id}"
+            style="border-color:${c.border};color:${c.text};background:${checked ? c.bg : '#fff'}">
+            <input type="checkbox" value="${m.id}" ${checked ? 'checked' : ''}
+              onchange="onMemberCheckChange('${m.id}', ${i})">
             <span class="check-mark" style="border-color:${c.dot}">
               <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="#fff" stroke-width="2"><path d="M2 5L4 7L8 3"/></svg>
             </span>
@@ -972,20 +972,17 @@
       }).join('');
     }
 
-    function toggleMemberCheck(label, memberId) {
+    function onMemberCheckChange(memberId, colorIndex) {
+      const label = document.getElementById('mcb-' + memberId);
       const input = label.querySelector('input');
-      const mi = getMemberIndex(memberId);
-      const c = getColor(mi >= 0 ? mi : 0);
-      // Toggle after click event processes
-      setTimeout(() => {
-        if (input.checked) {
-          label.classList.add('checked');
-          label.style.background = c.bg;
-        } else {
-          label.classList.remove('checked');
-          label.style.background = '#fff';
-        }
-      }, 0);
+      const c = getColor(colorIndex);
+      if (input.checked) {
+        label.classList.add('checked');
+        label.style.background = c.bg;
+      } else {
+        label.classList.remove('checked');
+        label.style.background = '#fff';
+      }
     }
 
     function getSelectedMemberIds() {
