@@ -250,6 +250,8 @@
       font-family: inherit; transition: border 0.15s;
     }
     .form-input:focus, .form-textarea:focus { border-color: var(--accent); }
+    .form-input[type="date"] { font-family: inherit; }
+    select.form-input { font-family: inherit; appearance: auto; cursor: pointer; }
     .form-textarea { resize: vertical; min-height: 70px; }
     .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
     .form-actions { display: flex; gap: 8px; margin-top: 4px; }
@@ -485,7 +487,16 @@
         </button>
       </div>
       <div class="modal-body">
-        <div id="event-form-info" style="padding:8px 12px;border-radius:8px;margin-bottom:14px;font-size:13px;font-weight:600;"></div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">対象メンバー</label>
+            <select class="form-input" id="ev-member" onchange="updateMemberSelectStyle()"></select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">日付</label>
+            <input class="form-input" type="date" id="ev-date">
+          </div>
+        </div>
         <div class="form-group">
           <label class="form-label">タイトル</label>
           <input class="form-input" id="ev-title" placeholder="会議、外出など">
@@ -863,7 +874,7 @@
       const dayEvents = getFilteredEvents(dateStr);
       if (dayEvents.length > 0) {
         openDayModal(dateStr);
-      } else if (viewingMember) {
+      } else if (members.length > 0) {
         editingEventId = null;
         openEventModal(dateStr);
       }
@@ -906,11 +917,11 @@
       if (dayEvents.length === 0) {
         html += '<p class="empty-msg">予定がありません</p>';
       }
-      if (viewingMember) {
+      if (members.length > 0) {
         html += `
-          <button class="btn btn-primary btn-full btn-icon" style="margin-top:12px" onclick="closeDayModal();openEventModal('${dateStr}')">
+          <button class="btn btn-primary btn-full btn-icon" style="margin-top:12px" onclick="closeDayModal();editingEventId=null;openEventModal('${dateStr}')">
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M7 3V11M3 7H11"/></svg>
-            ${viewingMember.name}の予定を追加
+            予定を追加
           </button>
         `;
       }
@@ -923,15 +934,29 @@
     }
 
     // ── Event Modal ──
+    function populateMemberSelect(selectedId) {
+      const sel = document.getElementById('ev-member');
+      sel.innerHTML = members.map((m, i) => {
+        const c = getColor(i);
+        return `<option value="${m.id}" ${m.id === selectedId ? 'selected' : ''}>${m.name}</option>`;
+      }).join('');
+      updateMemberSelectStyle();
+    }
+
+    function updateMemberSelectStyle() {
+      const sel = document.getElementById('ev-member');
+      const mi = getMemberIndex(sel.value);
+      const c = getColor(mi >= 0 ? mi : 0);
+      sel.style.borderColor = c.border;
+      sel.style.background = c.bg;
+      sel.style.color = c.text;
+      sel.style.fontWeight = '600';
+    }
+
     function openEventModal(dateStr) {
       selectedDate = dateStr;
-      const p = parseDate(dateStr);
-      const info = document.getElementById('event-form-info');
-      const mi = getMemberIndex(viewingMember.id);
-      const c = getColor(mi >= 0 ? mi : 0);
-      info.style.background = c.bg;
-      info.style.color = c.text;
-      info.textContent = `👤 ${viewingMember.name} ・ 📅 ${p.month+1}/${p.day}`;
+      populateMemberSelect(viewingMember ? viewingMember.id : (currentMember ? currentMember.id : ''));
+      document.getElementById('ev-date').value = dateStr;
 
       if (!editingEventId) {
         document.getElementById('event-modal-title').textContent = '予定を追加';
@@ -952,7 +977,7 @@
     }
 
     function openAddEvent() {
-      if (!viewingMember) return;
+      if (members.length === 0) return;
       editingEventId = null;
       selectedDate = todayStr();
       openEventModal(selectedDate);
@@ -961,8 +986,6 @@
     function editEvent(dateStr, eventId) {
       const ev = (events[dateStr] || []).find(e => e.id === eventId);
       if (!ev) return;
-      const member = getMember(ev.memberId);
-      if (member) viewingMember = member;
 
       editingEventId = eventId;
       selectedDate = dateStr;
@@ -974,16 +997,21 @@
       document.querySelector('#event-modal .form-actions .btn-primary').textContent = '更新する';
 
       closeDayModal();
+      // Pass the event's memberId so the dropdown selects the right member
+      populateMemberSelect(ev.memberId);
+      document.getElementById('ev-date').value = dateStr;
       openEventModal(dateStr);
     }
 
     async function saveEvent() {
       const title = document.getElementById('ev-title').value.trim();
-      if (!title || !selectedDate || !viewingMember) return;
+      const memberId = document.getElementById('ev-member').value;
+      const date = document.getElementById('ev-date').value;
+      if (!title || !date || !memberId) return;
 
       const data = {
-        date: selectedDate,
-        memberId: viewingMember.id,
+        date: date,
+        memberId: memberId,
         title,
         startTime: document.getElementById('ev-start').value,
         endTime: document.getElementById('ev-end').value,
@@ -993,7 +1021,15 @@
 
       try {
         if (editingEventId) {
-          await db.collection('events').doc(editingEventId).update(data);
+          // If date changed, delete old and create new
+          const oldDate = selectedDate;
+          if (oldDate !== date) {
+            await db.collection('events').doc(editingEventId).delete();
+            data.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+            await db.collection('events').add(data);
+          } else {
+            await db.collection('events').doc(editingEventId).update(data);
+          }
         } else {
           data.createdAt = firebase.firestore.FieldValue.serverTimestamp();
           await db.collection('events').add(data);
