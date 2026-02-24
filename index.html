@@ -252,6 +252,26 @@
     .form-input:focus, .form-textarea:focus { border-color: var(--accent); }
     .form-input[type="date"] { font-family: inherit; }
     select.form-input { font-family: inherit; appearance: auto; cursor: pointer; }
+    .member-checkbox-list {
+      display: flex; flex-wrap: wrap; gap: 6px;
+      padding: 8px; border: 1.5px solid var(--border); border-radius: var(--radius);
+      background: var(--bg); min-height: 40px;
+    }
+    .member-checkbox-item {
+      display: flex; align-items: center; gap: 5px;
+      padding: 5px 12px 5px 8px; border-radius: 20px; cursor: pointer;
+      font-size: 13px; font-weight: 600; border: 2px solid;
+      transition: all 0.15s; user-select: none;
+    }
+    .member-checkbox-item input { display: none; }
+    .member-checkbox-item .check-mark {
+      width: 16px; height: 16px; border-radius: 4px; border: 2px solid;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0; transition: background 0.15s;
+    }
+    .member-checkbox-item.checked .check-mark { background: currentColor; }
+    .member-checkbox-item.checked .check-mark svg { display: block; }
+    .member-checkbox-item .check-mark svg { display: none; }
     .form-textarea { resize: vertical; min-height: 70px; }
     .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
     .form-actions { display: flex; gap: 8px; margin-top: 4px; }
@@ -487,15 +507,13 @@
         </button>
       </div>
       <div class="modal-body">
-        <div class="form-row">
-          <div class="form-group">
-            <label class="form-label">対象メンバー</label>
-            <select class="form-input" id="ev-member" onchange="updateMemberSelectStyle()"></select>
-          </div>
-          <div class="form-group">
-            <label class="form-label">日付</label>
-            <input class="form-input" type="date" id="ev-date">
-          </div>
+        <div class="form-group">
+          <label class="form-label">対象メンバー（複数選択可）</label>
+          <div id="ev-member-list" class="member-checkbox-list"></div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">日付</label>
+          <input class="form-input" type="date" id="ev-date">
         </div>
         <div class="form-group">
           <label class="form-label">タイトル</label>
@@ -934,31 +952,54 @@
     }
 
     // ── Event Modal ──
-    function populateMemberSelect(selectedId) {
-      const sel = document.getElementById('ev-member');
-      sel.innerHTML = members.map((m, i) => {
+    function populateMemberCheckboxes(selectedIds) {
+      if (!Array.isArray(selectedIds)) selectedIds = selectedIds ? [selectedIds] : [];
+      const container = document.getElementById('ev-member-list');
+      container.innerHTML = members.map((m, i) => {
         const c = getColor(i);
-        return `<option value="${m.id}" ${m.id === selectedId ? 'selected' : ''}>${m.name}</option>`;
+        const checked = selectedIds.includes(m.id);
+        return `
+          <label class="member-checkbox-item ${checked ? 'checked' : ''}"
+            style="border-color:${c.border};color:${c.text};background:${checked ? c.bg : '#fff'}"
+            onclick="toggleMemberCheck(this,'${m.id}')">
+            <input type="checkbox" value="${m.id}" ${checked ? 'checked' : ''}>
+            <span class="check-mark" style="border-color:${c.dot}">
+              <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="#fff" stroke-width="2"><path d="M2 5L4 7L8 3"/></svg>
+            </span>
+            ${m.name}
+          </label>
+        `;
       }).join('');
-      updateMemberSelectStyle();
     }
 
-    function updateMemberSelectStyle() {
-      const sel = document.getElementById('ev-member');
-      const mi = getMemberIndex(sel.value);
+    function toggleMemberCheck(label, memberId) {
+      const input = label.querySelector('input');
+      const mi = getMemberIndex(memberId);
       const c = getColor(mi >= 0 ? mi : 0);
-      sel.style.borderColor = c.border;
-      sel.style.background = c.bg;
-      sel.style.color = c.text;
-      sel.style.fontWeight = '600';
+      // Toggle after click event processes
+      setTimeout(() => {
+        if (input.checked) {
+          label.classList.add('checked');
+          label.style.background = c.bg;
+        } else {
+          label.classList.remove('checked');
+          label.style.background = '#fff';
+        }
+      }, 0);
+    }
+
+    function getSelectedMemberIds() {
+      const checkboxes = document.querySelectorAll('#ev-member-list input[type="checkbox"]:checked');
+      return Array.from(checkboxes).map(cb => cb.value);
     }
 
     function openEventModal(dateStr) {
       selectedDate = dateStr;
-      populateMemberSelect(viewingMember ? viewingMember.id : (currentMember ? currentMember.id : ''));
-      document.getElementById('ev-date').value = dateStr;
-
+      const defaultMember = viewingMember ? viewingMember.id : (currentMember ? currentMember.id : '');
+      
       if (!editingEventId) {
+        populateMemberCheckboxes([defaultMember]);
+        document.getElementById('ev-date').value = dateStr;
         document.getElementById('event-modal-title').textContent = '予定を追加';
         document.getElementById('ev-title').value = '';
         document.getElementById('ev-start').value = '09:00';
@@ -997,21 +1038,21 @@
       document.querySelector('#event-modal .form-actions .btn-primary').textContent = '更新する';
 
       closeDayModal();
-      // Pass the event's memberId so the dropdown selects the right member
-      populateMemberSelect(ev.memberId);
+      populateMemberCheckboxes([ev.memberId]);
       document.getElementById('ev-date').value = dateStr;
       openEventModal(dateStr);
     }
 
     async function saveEvent() {
       const title = document.getElementById('ev-title').value.trim();
-      const memberId = document.getElementById('ev-member').value;
+      const memberIds = getSelectedMemberIds();
       const date = document.getElementById('ev-date').value;
-      if (!title || !date || !memberId) return;
+      if (!title || !date || memberIds.length === 0) {
+        if (memberIds.length === 0) alert('対象メンバーを1人以上選択してください');
+        return;
+      }
 
-      const data = {
-        date: date,
-        memberId: memberId,
+      const baseData = {
         title,
         startTime: document.getElementById('ev-start').value,
         endTime: document.getElementById('ev-end').value,
@@ -1021,7 +1062,9 @@
 
       try {
         if (editingEventId) {
-          // If date changed, delete old and create new
+          // Editing: update existing event with first selected member, create new for rest
+          const firstId = memberIds[0];
+          const data = { ...baseData, date, memberId: firstId };
           const oldDate = selectedDate;
           if (oldDate !== date) {
             await db.collection('events').doc(editingEventId).delete();
@@ -1030,9 +1073,21 @@
           } else {
             await db.collection('events').doc(editingEventId).update(data);
           }
+          // Create new events for additional members
+          for (let i = 1; i < memberIds.length; i++) {
+            await db.collection('events').add({
+              ...baseData, date, memberId: memberIds[i],
+              createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+            });
+          }
         } else {
-          data.createdAt = firebase.firestore.FieldValue.serverTimestamp();
-          await db.collection('events').add(data);
+          // New: create one event per selected member
+          for (const memberId of memberIds) {
+            await db.collection('events').add({
+              ...baseData, date, memberId,
+              createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+            });
+          }
         }
         closeEventModal();
       } catch (err) {
