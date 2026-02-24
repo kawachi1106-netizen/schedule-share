@@ -410,7 +410,7 @@
         <button class="icon-btn" onclick="toggleSidebar()" aria-label="メニュー">
           <svg width="22" height="22" viewBox="0 0 22 22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6H19M3 11H19M3 16H19"/></svg>
         </button>
-        <h1>DAIHEN<span>FA West Japan</span></h1>
+        <h1>Schedule<span>Share</span></h1>
       </div>
       <div class="header-right">
         <button class="icon-btn bg" onclick="refreshData()" title="再読み込み">
@@ -547,7 +547,13 @@
           <label class="form-label">タイトル</label>
           <input class="form-input" id="ev-title" placeholder="会議、外出など">
         </div>
-        <div class="form-row">
+        <div class="form-group">
+          <label class="form-label" style="display:flex;align-items:center;gap:8px;cursor:pointer">
+            <input type="checkbox" id="ev-allday" onchange="toggleAllDay()" style="width:16px;height:16px;cursor:pointer">
+            終日
+          </label>
+        </div>
+        <div class="form-row" id="ev-time-row">
           <div class="form-group">
             <label class="form-label">開始時刻</label>
             <input class="form-input" type="time" id="ev-start" value="09:00">
@@ -907,7 +913,7 @@
         dayEvents.slice(0, 3).forEach(ev => {
           const mi = getMemberIndex(ev.memberId);
           const c = getColor(mi >= 0 ? mi : 0);
-          html += `<div class="event-chip" style="background:${c.bg};color:${c.text};border-left-color:${c.border}">${ev.startTime} ${ev.title}</div>`;
+          html += `<div class="event-chip" style="background:${c.bg};color:${c.text};border-left-color:${c.border}">${ev.allDay ? '終日' : ev.startTime} ${ev.title}</div>`;
         });
         if (dayEvents.length > 3) {
           html += `<div class="more-events">+${dayEvents.length - 3}件</div>`;
@@ -933,7 +939,9 @@
           const ai = getMemberIndex(a.memberId);
           const bi = getMemberIndex(b.memberId);
           if (ai !== bi) return ai - bi;
-          return a.startTime.localeCompare(b.startTime);
+          if (a.allDay && !b.allDay) return -1;
+          if (!a.allDay && b.allDay) return 1;
+          return (a.startTime || '').localeCompare(b.startTime || '');
         });
     }
 
@@ -995,7 +1003,7 @@
               <div class="event-card-header">
                 <div>
                   <div class="event-card-title" style="color:${c.text}">${ev.title}</div>
-                  <div class="event-card-info">🕐 ${ev.startTime} ～ ${ev.endTime}</div>
+                  <div class="event-card-info">🕐 ${ev.allDay ? '終日' : ev.startTime + ' ～ ' + ev.endTime}</div>
                   <div class="event-card-info">👤 ${member?.name || '不明'}</div>
                   ${ev.memo ? `<div class="event-card-info" style="margin-top:4px">📝 ${ev.memo}</div>` : ''}
                 </div>
@@ -1109,6 +1117,11 @@
       return Array.from(checkboxes).map(cb => cb.value);
     }
 
+    function toggleAllDay() {
+      const checked = document.getElementById('ev-allday').checked;
+      document.getElementById('ev-time-row').style.display = checked ? 'none' : 'flex';
+    }
+
     function openEventModal(dateStr) {
       selectedDate = dateStr;
       const defaultMember = viewingMember ? viewingMember.id : (currentMember ? currentMember.id : '');
@@ -1120,6 +1133,8 @@
         document.getElementById('ev-title').value = '';
         document.getElementById('ev-start').value = '09:00';
         document.getElementById('ev-end').value = '10:00';
+        document.getElementById('ev-allday').checked = false;
+        document.getElementById('ev-time-row').style.display = 'flex';
         document.getElementById('ev-memo').value = '';
         document.querySelector('#event-modal .form-actions .btn-primary').textContent = '追加する';
       }
@@ -1148,8 +1163,10 @@
       selectedDate = dateStr;
       document.getElementById('event-modal-title').textContent = '予定を編集';
       document.getElementById('ev-title').value = ev.title;
-      document.getElementById('ev-start').value = ev.startTime;
-      document.getElementById('ev-end').value = ev.endTime;
+      document.getElementById('ev-start').value = ev.startTime || '09:00';
+      document.getElementById('ev-end').value = ev.endTime || '10:00';
+      document.getElementById('ev-allday').checked = !!ev.allDay;
+      document.getElementById('ev-time-row').style.display = ev.allDay ? 'none' : 'flex';
       document.getElementById('ev-memo').value = ev.memo || '';
       document.querySelector('#event-modal .form-actions .btn-primary').textContent = '更新する';
 
@@ -1168,10 +1185,12 @@
         return;
       }
 
+      const isAllDay = document.getElementById('ev-allday').checked;
       const baseData = {
         title,
-        startTime: document.getElementById('ev-start').value,
-        endTime: document.getElementById('ev-end').value,
+        allDay: isAllDay,
+        startTime: isAllDay ? '' : document.getElementById('ev-start').value,
+        endTime: isAllDay ? '' : document.getElementById('ev-end').value,
         memo: document.getElementById('ev-memo').value.trim(),
         updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
       };
