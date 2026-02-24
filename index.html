@@ -411,6 +411,10 @@
           </button>
         </div>
         <div id="member-list" class="member-list"></div>
+        <div style="display:flex;gap:6px;margin-top:8px;margin-bottom:4px;">
+          <button class="sidebar-add-btn" style="flex:1;justify-content:center" onclick="filterAll()">全表示</button>
+          <button class="sidebar-add-btn" style="flex:1;justify-content:center" onclick="filterNone()">全非表示</button>
+        </div>
         <div class="sidebar-help">
           <strong>使い方</strong><br>
           ✓ チェックで表示/非表示を切替<br>
@@ -796,6 +800,18 @@
       renderCalendar();
     }
 
+    function filterAll() {
+      filterSet = new Set(members.map(m => m.id));
+      renderMemberList();
+      renderCalendar();
+    }
+
+    function filterNone() {
+      filterSet.clear();
+      renderMemberList();
+      renderCalendar();
+    }
+
     function updateViewingIndicator() {
       const el = document.getElementById('viewing-indicator');
       if (!viewingMember || !currentMember || viewingMember.id === currentMember.id) {
@@ -869,7 +885,14 @@
 
     function getFilteredEvents(dateStr) {
       if (!events[dateStr]) return [];
-      return events[dateStr].filter(e => filterSet.has(e.memberId));
+      return events[dateStr]
+        .filter(e => filterSet.has(e.memberId))
+        .sort((a, b) => {
+          const ai = getMemberIndex(a.memberId);
+          const bi = getMemberIndex(b.memberId);
+          if (ai !== bi) return ai - bi;
+          return a.startTime.localeCompare(b.startTime);
+        });
     }
 
     function prevMonth() {
