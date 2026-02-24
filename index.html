@@ -1,0 +1,1090 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>ScheduleShare - スケジュール共有</title>
+  <link rel="manifest" href="manifest.json">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #F8FAFC;
+      --surface: #FFFFFF;
+      --border: #E2E8F0;
+      --border-light: #F1F5F9;
+      --text-primary: #1E293B;
+      --text-secondary: #475569;
+      --text-muted: #94A3B8;
+      --text-dim: #64748B;
+      --accent: #4285F4;
+      --danger: #DC2626;
+      --danger-bg: #FEE2E2;
+      --danger-border: #FECACA;
+      --today-bg: #FFFBEB;
+      --shadow-sm: 0 1px 3px rgba(0,0,0,0.04);
+      --shadow-md: 0 4px 12px rgba(0,0,0,0.08);
+      --shadow-lg: 0 24px 48px rgba(0,0,0,0.18);
+      --radius: 10px;
+      --radius-lg: 14px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Noto Sans JP', sans-serif;
+      background: var(--bg);
+      color: var(--text-primary);
+      min-height: 100vh;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ── Header ── */
+    .header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 0 16px;
+      height: 56px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .header-left { display: flex; align-items: center; gap: 10px; }
+    .header h1 { font-size: 16px; font-weight: 800; letter-spacing: -0.02em; }
+    .header h1 span { color: var(--accent); }
+    .header-right { display: flex; align-items: center; gap: 8px; }
+
+    .icon-btn {
+      background: none; border: none; cursor: pointer; padding: 6px;
+      color: var(--text-secondary); display: flex; align-items: center;
+      border-radius: 8px; transition: background 0.15s;
+    }
+    .icon-btn:hover { background: var(--border-light); }
+    .icon-btn.bg { background: var(--border-light); }
+
+    .user-badge {
+      display: flex; align-items: center; gap: 6px;
+      padding: 5px 12px; border-radius: 20px;
+      font-size: 13px; font-weight: 600;
+    }
+    .user-badge .dot { width: 8px; height: 8px; border-radius: 50%; }
+
+    /* ── Layout ── */
+    .layout { display: flex; position: relative; }
+
+    /* ── Sidebar ── */
+    .sidebar {
+      width: 260px; background: var(--surface);
+      border-right: 1px solid var(--border);
+      padding: 16px; min-height: calc(100vh - 56px); flex-shrink: 0;
+    }
+    .sidebar-header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 12px;
+    }
+    .sidebar-header h3 {
+      font-size: 13px; font-weight: 700; color: var(--text-muted);
+      letter-spacing: 0.06em;
+    }
+    .sidebar-add-btn {
+      background: var(--border-light); border: none; border-radius: 8px;
+      padding: 5px 10px; cursor: pointer; color: var(--text-secondary);
+      font-size: 12px; font-weight: 600; display: flex; align-items: center;
+      gap: 4px; font-family: inherit; transition: background 0.15s;
+    }
+    .sidebar-add-btn:hover { background: var(--border); }
+
+    .member-list { display: flex; flex-direction: column; gap: 4px; }
+    .member-item {
+      display: flex; align-items: center; gap: 8px; padding: 8px 10px;
+      border-radius: var(--radius); cursor: pointer;
+      border: 1.5px solid transparent; transition: all 0.15s;
+    }
+    .member-item:hover { background: var(--border-light); }
+    .member-item.active { border-color: currentColor; }
+
+    .member-check {
+      width: 18px; height: 18px; border-radius: 5px; border: 2px solid;
+      cursor: pointer; flex-shrink: 0; display: flex;
+      align-items: center; justify-content: center; background: transparent;
+      transition: background 0.15s; padding: 0;
+    }
+    .member-check.checked { background: currentColor; }
+    .member-check svg { width: 10px; height: 10px; }
+
+    .member-name { font-size: 14px; font-weight: 500; flex: 1; }
+    .member-item.active .member-name { font-weight: 700; }
+    .editing-badge {
+      font-size: 10px; font-weight: 600; padding: 2px 6px; border-radius: 4px;
+    }
+
+    .sidebar-help {
+      margin-top: 20px; padding: 12px; background: var(--bg);
+      border-radius: var(--radius); font-size: 11px; color: var(--text-muted); line-height: 1.6;
+    }
+    .sidebar-help strong { color: var(--text-dim); }
+
+    .sidebar-overlay { display: none; }
+
+    /* ── Main ── */
+    .main {
+      flex: 1; padding: 16px; max-width: 900px; margin: 0 auto; width: 100%;
+    }
+    .month-nav {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 16px; flex-wrap: wrap; gap: 8px;
+    }
+    .month-nav-left { display: flex; align-items: center; gap: 6px; }
+    .month-nav h2 {
+      font-size: 20px; font-weight: 800; min-width: 140px; text-align: center;
+    }
+    .nav-btn {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 8px 10px; cursor: pointer;
+      display: flex; color: var(--text-secondary); transition: background 0.15s;
+    }
+    .nav-btn:hover { background: var(--border-light); }
+    .month-nav-right { display: flex; gap: 6px; }
+
+    .viewing-indicator {
+      padding: 8px 14px; border-radius: var(--radius); margin-bottom: 12px;
+      font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 8px;
+    }
+
+    /* ── Calendar ── */
+    .calendar {
+      background: var(--surface); border-radius: var(--radius-lg);
+      border: 1px solid var(--border); overflow: hidden; box-shadow: var(--shadow-sm);
+    }
+    .cal-header {
+      display: grid; grid-template-columns: repeat(7, 1fr);
+      border-bottom: 1px solid var(--border);
+    }
+    .cal-header-cell {
+      padding: 10px 4px; text-align: center; font-size: 12px;
+      font-weight: 700; letter-spacing: 0.05em;
+    }
+    .cal-header-cell.sun { color: var(--danger); }
+    .cal-header-cell.sat { color: #2563EB; }
+    .cal-header-cell.weekday { color: var(--text-muted); }
+
+    .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); }
+    .cal-cell {
+      min-height: 80px; padding: 4px 5px;
+      border-right: 1px solid var(--border-light);
+      border-bottom: 1px solid var(--border-light);
+      cursor: pointer; transition: background 0.1s;
+    }
+    .cal-cell:nth-child(7n) { border-right: none; }
+    .cal-cell:hover { background: #EFF6FF; }
+    .cal-cell.empty { background: #FAFBFC; cursor: default; }
+    .cal-cell.empty:hover { background: #FAFBFC; }
+    .cal-cell.today { background: var(--today-bg); }
+
+    .cal-day {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 26px; height: 26px; border-radius: 50%; font-size: 13px;
+      font-weight: 700; margin-bottom: 2px;
+    }
+    .cal-day.today { background: var(--text-primary); color: #fff; }
+    .cal-day.sun { color: var(--danger); }
+    .cal-day.sat { color: #2563EB; }
+
+    .cal-events { display: flex; flex-direction: column; gap: 2px; }
+    .event-chip {
+      padding: 2px 5px; border-radius: 4px; font-size: 10px; font-weight: 600;
+      border-left: 3px solid; white-space: nowrap; overflow: hidden;
+      text-overflow: ellipsis; transition: transform 0.1s; cursor: pointer;
+    }
+    .event-chip:hover { transform: scale(1.03); }
+    .more-events { font-size: 10px; color: var(--text-muted); font-weight: 600; padding-left: 4px; }
+
+    /* ── Buttons ── */
+    .btn {
+      padding: 10px 20px; border-radius: var(--radius); font-size: 14px;
+      font-weight: 600; cursor: pointer; font-family: inherit;
+      transition: opacity 0.15s; border: none;
+    }
+    .btn:hover { opacity: 0.85; }
+    .btn-primary { background: var(--text-primary); color: #fff; }
+    .btn-secondary { background: var(--border-light); color: var(--text-secondary); border: 1px solid var(--border); }
+    .btn-danger { background: var(--danger-bg); color: var(--danger); border: 1px solid var(--danger-border); }
+    .btn-sm { padding: 8px 14px; font-size: 13px; }
+    .btn-icon { display: inline-flex; align-items: center; gap: 4px; }
+    .btn-full { width: 100%; }
+
+    /* ── Modal ── */
+    .modal-overlay {
+      position: fixed; inset: 0; z-index: 1000;
+      display: flex; align-items: center; justify-content: center;
+      background: rgba(15,23,42,0.45); backdrop-filter: blur(4px);
+      padding: 16px; opacity: 0; pointer-events: none; transition: opacity 0.2s;
+    }
+    .modal-overlay.open { opacity: 1; pointer-events: all; }
+    .modal {
+      background: var(--surface); border-radius: 16px; width: 100%; max-width: 420px;
+      max-height: 90vh; overflow: auto; box-shadow: var(--shadow-lg);
+      transform: translateY(12px) scale(0.97); transition: transform 0.2s;
+    }
+    .modal-overlay.open .modal { transform: none; }
+    .modal.wide { max-width: 460px; }
+    .modal-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 18px 20px 14px; border-bottom: 1px solid var(--border);
+    }
+    .modal-header h3 { font-size: 17px; font-weight: 700; }
+    .modal-body { padding: 16px 20px 20px; }
+
+    /* ── Form ── */
+    .form-group { margin-bottom: 14px; }
+    .form-label {
+      display: block; font-size: 12px; font-weight: 600; color: var(--text-dim);
+      margin-bottom: 5px; letter-spacing: 0.03em;
+    }
+    .form-input, .form-textarea {
+      width: 100%; padding: 10px 12px; border: 1.5px solid var(--border);
+      border-radius: var(--radius); font-size: 14px; outline: none;
+      font-family: inherit; transition: border 0.15s;
+    }
+    .form-input:focus, .form-textarea:focus { border-color: var(--accent); }
+    .form-textarea { resize: vertical; min-height: 70px; }
+    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .form-actions { display: flex; gap: 8px; margin-top: 4px; }
+    .form-actions .btn { flex: 1; }
+
+    /* ── Login ── */
+    .login-icon {
+      width: 56px; height: 56px; border-radius: 14px; background: var(--text-primary);
+      display: inline-flex; align-items: center; justify-content: center; margin-bottom: 12px;
+    }
+    .login-desc { font-size: 13px; color: var(--text-dim); line-height: 1.6; }
+    .member-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+    .member-tag {
+      padding: 6px 14px; border-radius: 20px; font-size: 13px; font-weight: 500;
+      border: 1.5px solid var(--border); background: var(--surface);
+      color: var(--text-secondary); cursor: pointer; font-family: inherit;
+      transition: all 0.15s;
+    }
+    .member-tag.selected { border-width: 2px; }
+
+    /* ── Day Detail ── */
+    .event-card {
+      padding: 12px 14px; border-radius: 12px; border-left: 4px solid;
+      margin-bottom: 8px;
+    }
+    .event-card-header { display: flex; justify-content: space-between; align-items: flex-start; }
+    .event-card-title { font-size: 15px; font-weight: 700; margin-bottom: 4px; }
+    .event-card-info { font-size: 12px; color: var(--text-dim); margin-bottom: 2px; }
+    .event-card-actions { display: flex; gap: 4px; }
+    .event-action-btn {
+      background: var(--surface); border-radius: 6px; padding: 6px;
+      cursor: pointer; display: flex; transition: opacity 0.15s;
+    }
+    .event-action-btn:hover { opacity: 0.7; }
+    .event-action-btn.delete { background: var(--danger-bg); border: 1px solid var(--danger-border); color: var(--danger); }
+
+    /* ── Member Management ── */
+    .member-manage-item {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 10px 12px; border-radius: var(--radius); margin-bottom: 6px;
+    }
+    .member-manage-left { display: flex; align-items: center; gap: 8px; }
+    .member-manage-dot { width: 10px; height: 10px; border-radius: 50%; }
+    .member-manage-name { font-size: 14px; font-weight: 600; }
+    .you-badge {
+      font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 4px; color: #fff;
+    }
+
+    /* ── Connection Status ── */
+    .conn-status {
+      position: fixed; bottom: 16px; right: 16px; padding: 8px 14px;
+      border-radius: 20px; font-size: 12px; font-weight: 600;
+      z-index: 50; box-shadow: var(--shadow-md); display: flex;
+      align-items: center; gap: 6px; transition: opacity 0.3s;
+    }
+    .conn-status .pulse {
+      width: 8px; height: 8px; border-radius: 50%; animation: pulse 2s infinite;
+    }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+    .conn-status.online { background: #E6F9EF; color: #276749; }
+    .conn-status.online .pulse { background: #34A853; }
+    .conn-status.offline { background: var(--danger-bg); color: var(--danger); }
+    .conn-status.offline .pulse { background: var(--danger); }
+
+    .empty-msg { color: var(--text-muted); font-size: 13px; text-align: center; padding: 20px; }
+
+    /* ── Mobile ── */
+    @media (max-width: 768px) {
+      .sidebar {
+        position: fixed; left: 0; top: 56px; bottom: 0; z-index: 900;
+        transform: translateX(-100%); transition: transform 0.25s ease;
+      }
+      .sidebar.open { transform: translateX(0); box-shadow: var(--shadow-lg); }
+      .sidebar-overlay.open {
+        display: block; position: fixed; inset: 0; top: 56px;
+        z-index: 899; background: rgba(0,0,0,0.3);
+      }
+      .cal-cell { min-height: 60px; padding: 3px 2px; }
+      .cal-day { width: 22px; height: 22px; font-size: 11px; }
+      .event-chip { font-size: 9px; padding: 1px 3px; }
+      .month-nav h2 { font-size: 17px; min-width: 120px; }
+    }
+
+    /* ── Loading Spinner ── */
+    .loading-screen {
+      display: flex; flex-direction: column; align-items: center;
+      justify-content: center; height: 100vh; color: var(--text-dim);
+    }
+    .spinner {
+      width: 32px; height: 32px; border: 3px solid var(--border);
+      border-top-color: var(--accent); border-radius: 50%;
+      animation: spin 0.8s linear infinite; margin-bottom: 12px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .hidden { display: none !important; }
+  </style>
+</head>
+<body>
+
+  <!-- Loading Screen -->
+  <div id="loading-screen" class="loading-screen">
+    <div class="spinner"></div>
+    <div>読み込み中...</div>
+  </div>
+
+  <!-- App (hidden until loaded) -->
+  <div id="app" class="hidden">
+
+    <!-- Header -->
+    <header class="header">
+      <div class="header-left">
+        <button class="icon-btn" onclick="toggleSidebar()" aria-label="メニュー">
+          <svg width="22" height="22" viewBox="0 0 22 22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6H19M3 11H19M3 16H19"/></svg>
+        </button>
+        <h1>Schedule<span>Share</span></h1>
+      </div>
+      <div class="header-right">
+        <button class="icon-btn bg" onclick="refreshData()" title="再読み込み">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M2 8C2 4.7 4.7 2 8 2C10.5 2 12.6 3.6 13.5 5.8M14 8C14 11.3 11.3 14 8 14C5.5 14 3.4 12.4 2.5 10.2"/><path d="M13 2.5V6H9.5M3 13.5V10H6.5"/></svg>
+        </button>
+        <div id="user-badge" class="user-badge"></div>
+      </div>
+    </header>
+
+    <div class="layout">
+      <!-- Sidebar Overlay -->
+      <div id="sidebar-overlay" class="sidebar-overlay" onclick="toggleSidebar()"></div>
+
+      <!-- Sidebar -->
+      <aside id="sidebar" class="sidebar">
+        <div class="sidebar-header">
+          <h3>メンバー</h3>
+          <button class="sidebar-add-btn" onclick="openMemberModal()">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M7 3V11M3 7H11"/></svg>
+            追加
+          </button>
+        </div>
+        <div id="member-list" class="member-list"></div>
+        <div class="sidebar-help">
+          <strong>使い方</strong><br>
+          ✓ チェックで表示/非表示を切替<br>
+          ✓ 名前クリックで編集対象を選択<br>
+          ✓ 日付クリックで予定を追加
+        </div>
+      </aside>
+
+      <!-- Main -->
+      <main class="main">
+        <div class="month-nav">
+          <div class="month-nav-left">
+            <button class="nav-btn" onclick="prevMonth()">
+              <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12.5 15L7.5 10L12.5 5"/></svg>
+            </button>
+            <h2 id="month-title"></h2>
+            <button class="nav-btn" onclick="nextMonth()">
+              <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M7.5 5L12.5 10L7.5 15"/></svg>
+            </button>
+          </div>
+          <div class="month-nav-right">
+            <button class="btn btn-secondary btn-sm" onclick="goToday()">今日</button>
+            <button id="add-event-btn" class="btn btn-primary btn-sm btn-icon" onclick="openAddEvent()">
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M7 3V11M3 7H11"/></svg>
+              予定追加
+            </button>
+          </div>
+        </div>
+        <div id="viewing-indicator" class="viewing-indicator hidden"></div>
+        <div class="calendar">
+          <div class="cal-header" id="cal-header"></div>
+          <div class="cal-grid" id="cal-grid"></div>
+        </div>
+      </main>
+    </div>
+
+    <!-- Connection Status -->
+    <div id="conn-status" class="conn-status online">
+      <div class="pulse"></div>
+      <span>接続中</span>
+    </div>
+  </div>
+
+  <!-- Login Modal -->
+  <div id="login-modal" class="modal-overlay open">
+    <div class="modal" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <h3>スケジュール共有</h3>
+        <div></div>
+      </div>
+      <div class="modal-body" style="text-align:center;">
+        <div class="login-icon">
+          <svg width="22" height="22" viewBox="0 0 22 22" fill="none" stroke="#fff" stroke-width="1.5" stroke-linecap="round"><circle cx="7" cy="6" r="3"/><path d="M1 18C1 14 4 12 7 12C10 12 13 14 13 18"/><circle cx="16" cy="7" r="2.5"/><path d="M21 18C21 15 19 13 16 13"/></svg>
+        </div>
+        <p class="login-desc">
+          名前を入力してログインしてください。<br>
+          初めての方は自動的にメンバー登録されます。
+        </p>
+        <div style="text-align:left; margin-top: 16px;">
+          <div class="form-group">
+            <label class="form-label">あなたの名前</label>
+            <input class="form-input" id="login-name" placeholder="例: 山田太郎" onkeydown="if(event.key==='Enter')handleLogin()">
+          </div>
+          <div class="form-group" id="login-members-group" style="display:none">
+            <label class="form-label">登録済みメンバー</label>
+            <div class="member-tags" id="login-member-tags"></div>
+          </div>
+          <button class="btn btn-primary btn-full" onclick="handleLogin()">ログイン</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Day Detail Modal -->
+  <div id="day-modal" class="modal-overlay" onclick="closeDayModal()">
+    <div class="modal wide" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <h3 id="day-modal-title"></h3>
+        <button class="icon-btn" onclick="closeDayModal()">
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 4L14 14M14 4L4 14"/></svg>
+        </button>
+      </div>
+      <div class="modal-body" id="day-modal-body"></div>
+    </div>
+  </div>
+
+  <!-- Event Modal -->
+  <div id="event-modal" class="modal-overlay" onclick="closeEventModal()">
+    <div class="modal" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <h3 id="event-modal-title">予定を追加</h3>
+        <button class="icon-btn" onclick="closeEventModal()">
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 4L14 14M14 4L4 14"/></svg>
+        </button>
+      </div>
+      <div class="modal-body">
+        <div id="event-form-info" style="padding:8px 12px;border-radius:8px;margin-bottom:14px;font-size:13px;font-weight:600;"></div>
+        <div class="form-group">
+          <label class="form-label">タイトル</label>
+          <input class="form-input" id="ev-title" placeholder="会議、外出など">
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">開始時刻</label>
+            <input class="form-input" type="time" id="ev-start" value="09:00">
+          </div>
+          <div class="form-group">
+            <label class="form-label">終了時刻</label>
+            <input class="form-input" type="time" id="ev-end" value="10:00">
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">メモ</label>
+          <textarea class="form-textarea" id="ev-memo" placeholder="詳細メモ（任意）"></textarea>
+        </div>
+        <div class="form-actions">
+          <button class="btn btn-secondary" onclick="closeEventModal()">キャンセル</button>
+          <button class="btn btn-primary" onclick="saveEvent()">追加する</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Member Modal -->
+  <div id="member-modal" class="modal-overlay" onclick="closeMemberModal()">
+    <div class="modal" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <h3>メンバー管理</h3>
+        <button class="icon-btn" onclick="closeMemberModal()">
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 4L14 14M14 4L4 14"/></svg>
+        </button>
+      </div>
+      <div class="modal-body">
+        <div style="display:flex;gap:8px;margin-bottom:16px;">
+          <input class="form-input" id="new-member-name" placeholder="新しいメンバー名"
+            style="flex:1;margin-bottom:0" onkeydown="if(event.key==='Enter')addMember()">
+          <button class="btn btn-primary" onclick="addMember()" style="padding:10px 16px">追加</button>
+        </div>
+        <div id="member-manage-list"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+
+  <script>
+    // ══════════════════════════════════════════
+    // 🔧 Firebase 設定 — ここを自分のプロジェクトの値に書き換えてください
+    // ══════════════════════════════════════════
+    const firebaseConfig = {
+      apiKey: "AIzaSyBsmReWCHaNnFv1_ZOep9FRFhG_hgKssRA",
+      authDomain: "daihenfa-westjapan.firebaseapp.com",
+      projectId: "daihenfa-westjapan",
+      storageBucket: "daihenfa-westjapan.firebasestorage.app",
+      messagingSenderId: "1026196339850",
+      appId: "1:1026196339850:web:3b12e178ba00a0a2518173"
+    };
+    // ══════════════════════════════════════════
+
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+
+    // ── Constants ──
+    const DAYS_JP = ["日","月","火","水","木","金","土"];
+    const MEMBER_COLORS = [
+      { bg:"#E8F0FE", border:"#4285F4", text:"#1A56DB", dot:"#4285F4" },
+      { bg:"#FEF3E2", border:"#F5A623", text:"#B7791F", dot:"#F5A623" },
+      { bg:"#E6F9EF", border:"#34A853", text:"#276749", dot:"#34A853" },
+      { bg:"#FDE8E8", border:"#EA4335", text:"#C53030", dot:"#EA4335" },
+      { bg:"#F3E8FF", border:"#9B59B6", text:"#6B21A8", dot:"#9B59B6" },
+      { bg:"#E0F7FA", border:"#00ACC1", text:"#006064", dot:"#00ACC1" },
+      { bg:"#FFF3E0", border:"#FF7043", text:"#BF360C", dot:"#FF7043" },
+      { bg:"#F1F8E9", border:"#7CB342", text:"#33691E", dot:"#7CB342" },
+    ];
+
+    // ── State ──
+    let members = [];
+    let events = {};  // { "2025-03-15": [ {id, memberId, title, startTime, endTime, memo}, ... ] }
+    let currentMember = null;
+    let viewingMember = null;
+    let filterSet = new Set();
+    let currentYear = new Date().getFullYear();
+    let currentMonth = new Date().getMonth();
+    let selectedDate = null;
+    let editingEventId = null;
+    let unsubMembers = null;
+    let unsubEvents = null;
+
+    function getColor(idx) { return MEMBER_COLORS[idx % MEMBER_COLORS.length]; }
+    function getMemberIndex(id) { return members.findIndex(m => m.id === id); }
+    function getMember(id) { return members.find(m => m.id === id); }
+    function formatDate(y, m, d) {
+      return `${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    }
+    function parseDate(s) {
+      const [y,m,d] = s.split('-').map(Number);
+      return { year:y, month:m-1, day:d };
+    }
+    function todayStr() {
+      const t = new Date();
+      return formatDate(t.getFullYear(), t.getMonth(), t.getDate());
+    }
+
+    // ── Firebase Realtime Listeners ──
+    function startListeners() {
+      // Members
+      unsubMembers = db.collection('members').orderBy('createdAt')
+        .onSnapshot(snap => {
+          members = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+          filterSet = new Set(members.map(m => m.id));
+          renderMemberList();
+          renderLoginMembers();
+          renderCalendar();
+          renderMemberManageList();
+          updateUserBadge();
+        }, err => {
+          console.error('Members listener error:', err);
+          setConnStatus(false);
+        });
+
+      // Events
+      unsubEvents = db.collection('events')
+        .onSnapshot(snap => {
+          events = {};
+          snap.docs.forEach(d => {
+            const data = d.data();
+            const dateKey = data.date;
+            if (!events[dateKey]) events[dateKey] = [];
+            events[dateKey].push({ id: d.id, ...data });
+          });
+          // Sort each day
+          Object.keys(events).forEach(k => {
+            events[k].sort((a,b) => a.startTime.localeCompare(b.startTime));
+          });
+          renderCalendar();
+        }, err => {
+          console.error('Events listener error:', err);
+          setConnStatus(false);
+        });
+
+      setConnStatus(true);
+    }
+
+    function setConnStatus(online) {
+      const el = document.getElementById('conn-status');
+      if (online) {
+        el.className = 'conn-status online';
+        el.innerHTML = '<div class="pulse"></div><span>リアルタイム同期中</span>';
+      } else {
+        el.className = 'conn-status offline';
+        el.innerHTML = '<div class="pulse"></div><span>接続エラー</span>';
+      }
+    }
+
+    // ── Login ──
+    async function handleLogin() {
+      const name = document.getElementById('login-name').value.trim();
+      if (!name) return;
+
+      let existing = members.find(m => m.name === name);
+      if (!existing) {
+        const ref = await db.collection('members').add({
+          name, createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        existing = { id: ref.id, name };
+      }
+      currentMember = existing;
+      viewingMember = existing;
+      localStorage.setItem('schedule-user', name);
+      document.getElementById('login-modal').classList.remove('open');
+      document.getElementById('app').classList.remove('hidden');
+      document.getElementById('loading-screen').classList.add('hidden');
+      renderAll();
+    }
+
+    function renderLoginMembers() {
+      const container = document.getElementById('login-member-tags');
+      const group = document.getElementById('login-members-group');
+      if (members.length === 0) { group.style.display = 'none'; return; }
+      group.style.display = 'block';
+      container.innerHTML = members.map((m, i) => {
+        const c = getColor(i);
+        return `<button class="member-tag" onclick="document.getElementById('login-name').value='${m.name}'"
+          style="border-color:${c.border};color:${c.text}">${m.name}</button>`;
+      }).join('');
+    }
+
+    // ── Auto Login ──
+    function tryAutoLogin() {
+      const saved = localStorage.getItem('schedule-user');
+      if (saved) {
+        document.getElementById('login-name').value = saved;
+        // Wait for members to load, then auto-login
+        const check = setInterval(() => {
+          const existing = members.find(m => m.name === saved);
+          if (existing) {
+            clearInterval(check);
+            currentMember = existing;
+            viewingMember = existing;
+            document.getElementById('login-modal').classList.remove('open');
+            document.getElementById('app').classList.remove('hidden');
+            document.getElementById('loading-screen').classList.add('hidden');
+            renderAll();
+          }
+        }, 200);
+        // Timeout after 5s
+        setTimeout(() => clearInterval(check), 5000);
+      } else {
+        document.getElementById('loading-screen').classList.add('hidden');
+      }
+    }
+
+    // ── Render All ──
+    function renderAll() {
+      updateUserBadge();
+      renderMemberList();
+      renderCalendar();
+      updateViewingIndicator();
+    }
+
+    function updateUserBadge() {
+      const el = document.getElementById('user-badge');
+      if (!currentMember) { el.innerHTML = ''; return; }
+      const i = getMemberIndex(currentMember.id);
+      const c = getColor(i >= 0 ? i : 0);
+      el.style.background = c.bg;
+      el.style.color = c.text;
+      el.innerHTML = `<div class="dot" style="background:${c.dot}"></div>${currentMember.name}`;
+    }
+
+    // ── Sidebar ──
+    function toggleSidebar() {
+      document.getElementById('sidebar').classList.toggle('open');
+      document.getElementById('sidebar-overlay').classList.toggle('open');
+    }
+
+    function renderMemberList() {
+      const container = document.getElementById('member-list');
+      container.innerHTML = members.map((m, i) => {
+        const c = getColor(i);
+        const isViewing = viewingMember?.id === m.id;
+        const isFiltered = filterSet.has(m.id);
+        return `
+          <div class="member-item ${isViewing ? 'active' : ''}"
+            style="${isViewing ? `background:${c.bg};border-color:${c.border};color:${c.text}` : ''}"
+            onclick="selectViewing('${m.id}')">
+            <button class="member-check ${isFiltered ? 'checked' : ''}"
+              style="border-color:${c.dot};${isFiltered ? 'background:'+c.dot : ''}"
+              onclick="event.stopPropagation();toggleFilter('${m.id}')">
+              ${isFiltered ? '<svg viewBox="0 0 10 10" fill="none" stroke="#fff" stroke-width="2"><path d="M2 5L4 7L8 3"/></svg>' : ''}
+            </button>
+            <span class="member-name" style="${isViewing ? 'color:'+c.text : ''}">${m.name}</span>
+            ${isViewing ? `<span class="editing-badge" style="color:${c.text};background:${c.border}22">編集中</span>` : ''}
+          </div>
+        `;
+      }).join('');
+      if (members.length === 0) {
+        container.innerHTML = '<p class="empty-msg">メンバーがいません</p>';
+      }
+    }
+
+    function selectViewing(id) {
+      viewingMember = getMember(id);
+      renderMemberList();
+      updateViewingIndicator();
+      // Close sidebar on mobile
+      document.getElementById('sidebar').classList.remove('open');
+      document.getElementById('sidebar-overlay').classList.remove('open');
+    }
+
+    function toggleFilter(id) {
+      if (filterSet.has(id)) filterSet.delete(id); else filterSet.add(id);
+      renderMemberList();
+      renderCalendar();
+    }
+
+    function updateViewingIndicator() {
+      const el = document.getElementById('viewing-indicator');
+      if (!viewingMember || !currentMember || viewingMember.id === currentMember.id) {
+        el.classList.add('hidden');
+        return;
+      }
+      el.classList.remove('hidden');
+      const i = getMemberIndex(viewingMember.id);
+      const c = getColor(i >= 0 ? i : 0);
+      el.style.background = c.bg;
+      el.style.color = c.text;
+      el.style.border = `1px solid ${c.border}40`;
+      el.innerHTML = `
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M8.5 2.5L11.5 5.5M1.5 10.5L1 13L3.5 12.5L12 4L10 2L1.5 10.5Z"/></svg>
+        ${viewingMember.name} さんの予定を編集中
+      `;
+    }
+
+    // ── Calendar ──
+    function renderCalendar() {
+      const title = document.getElementById('month-title');
+      title.textContent = `${currentYear}年 ${currentMonth + 1}月`;
+
+      // Header
+      const header = document.getElementById('cal-header');
+      header.innerHTML = DAYS_JP.map((d, i) =>
+        `<div class="cal-header-cell ${i===0?'sun':i===6?'sat':'weekday'}">${d}</div>`
+      ).join('');
+
+      // Grid
+      const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+      const firstDay = new Date(currentYear, currentMonth, 1).getDay();
+      const today = todayStr();
+
+      let html = '';
+      // Empty cells
+      for (let i = 0; i < firstDay; i++) {
+        html += '<div class="cal-cell empty"></div>';
+      }
+      // Day cells
+      for (let d = 1; d <= daysInMonth; d++) {
+        const dateStr = formatDate(currentYear, currentMonth, d);
+        const dow = (firstDay + d - 1) % 7;
+        const isToday = dateStr === today;
+        const dayEvents = getFilteredEvents(dateStr);
+
+        let dayClass = dow === 0 ? 'sun' : dow === 6 ? 'sat' : '';
+        html += `<div class="cal-cell ${isToday ? 'today' : ''}" onclick="onDayClick('${dateStr}')">`;
+        html += `<div class="cal-day ${dayClass} ${isToday ? 'today' : ''}">${d}</div>`;
+        html += '<div class="cal-events">';
+        dayEvents.slice(0, 3).forEach(ev => {
+          const mi = getMemberIndex(ev.memberId);
+          const c = getColor(mi >= 0 ? mi : 0);
+          html += `<div class="event-chip" style="background:${c.bg};color:${c.text};border-left-color:${c.border}">${ev.startTime} ${ev.title}</div>`;
+        });
+        if (dayEvents.length > 3) {
+          html += `<div class="more-events">+${dayEvents.length - 3}件</div>`;
+        }
+        html += '</div></div>';
+      }
+      // Padding
+      const total = firstDay + daysInMonth;
+      const remainder = total % 7;
+      if (remainder > 0) {
+        for (let i = 0; i < 7 - remainder; i++) {
+          html += '<div class="cal-cell empty"></div>';
+        }
+      }
+      document.getElementById('cal-grid').innerHTML = html;
+    }
+
+    function getFilteredEvents(dateStr) {
+      if (!events[dateStr]) return [];
+      return events[dateStr].filter(e => filterSet.has(e.memberId));
+    }
+
+    function prevMonth() {
+      if (currentMonth === 0) { currentYear--; currentMonth = 11; } else currentMonth--;
+      renderCalendar();
+    }
+    function nextMonth() {
+      if (currentMonth === 11) { currentYear++; currentMonth = 0; } else currentMonth++;
+      renderCalendar();
+    }
+    function goToday() {
+      const t = new Date();
+      currentYear = t.getFullYear();
+      currentMonth = t.getMonth();
+      renderCalendar();
+    }
+
+    function onDayClick(dateStr) {
+      selectedDate = dateStr;
+      const dayEvents = getFilteredEvents(dateStr);
+      if (dayEvents.length > 0) {
+        openDayModal(dateStr);
+      } else if (viewingMember) {
+        editingEventId = null;
+        openEventModal(dateStr);
+      }
+    }
+
+    // ── Day Detail Modal ──
+    function openDayModal(dateStr) {
+      const p = parseDate(dateStr);
+      const dow = DAYS_JP[new Date(p.year, p.month, p.day).getDay()];
+      document.getElementById('day-modal-title').textContent = `${p.year}年${p.month+1}月${p.day}日（${dow}）`;
+
+      const dayEvents = getFilteredEvents(dateStr);
+      let html = '';
+      dayEvents.forEach(ev => {
+        const mi = getMemberIndex(ev.memberId);
+        const c = getColor(mi >= 0 ? mi : 0);
+        const member = getMember(ev.memberId);
+        html += `
+          <div class="event-card" style="background:${c.bg};border-left-color:${c.border}">
+            <div class="event-card-header">
+              <div>
+                <div class="event-card-title" style="color:${c.text}">${ev.title}</div>
+                <div class="event-card-info">🕐 ${ev.startTime} ～ ${ev.endTime}</div>
+                <div class="event-card-info">👤 ${member?.name || '不明'}</div>
+                ${ev.memo ? `<div class="event-card-info" style="margin-top:4px">📝 ${ev.memo}</div>` : ''}
+              </div>
+              <div class="event-card-actions">
+                <button class="event-action-btn" style="border:1px solid ${c.border}40;color:${c.text}"
+                  onclick="editEvent('${dateStr}','${ev.id}')">
+                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M8.5 2.5L11.5 5.5M1.5 10.5L1 13L3.5 12.5L12 4L10 2L1.5 10.5Z"/></svg>
+                </button>
+                <button class="event-action-btn delete" onclick="deleteEvent('${dateStr}','${ev.id}')">
+                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M2 4H12M5 4V2.5C5 2.2 5.2 2 5.5 2H8.5C8.8 2 9 2.2 9 2.5V4M3.5 4V12C3.5 12.3 3.7 12.5 4 12.5H10C10.3 12.5 10.5 12.3 10.5 12V4"/></svg>
+                </button>
+              </div>
+            </div>
+          </div>
+        `;
+      });
+      if (dayEvents.length === 0) {
+        html += '<p class="empty-msg">予定がありません</p>';
+      }
+      if (viewingMember) {
+        html += `
+          <button class="btn btn-primary btn-full btn-icon" style="margin-top:12px" onclick="closeDayModal();openEventModal('${dateStr}')">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M7 3V11M3 7H11"/></svg>
+            ${viewingMember.name}の予定を追加
+          </button>
+        `;
+      }
+      document.getElementById('day-modal-body').innerHTML = html;
+      document.getElementById('day-modal').classList.add('open');
+    }
+
+    function closeDayModal() {
+      document.getElementById('day-modal').classList.remove('open');
+    }
+
+    // ── Event Modal ──
+    function openEventModal(dateStr) {
+      selectedDate = dateStr;
+      const p = parseDate(dateStr);
+      const info = document.getElementById('event-form-info');
+      const mi = getMemberIndex(viewingMember.id);
+      const c = getColor(mi >= 0 ? mi : 0);
+      info.style.background = c.bg;
+      info.style.color = c.text;
+      info.textContent = `👤 ${viewingMember.name} ・ 📅 ${p.month+1}/${p.day}`;
+
+      if (!editingEventId) {
+        document.getElementById('event-modal-title').textContent = '予定を追加';
+        document.getElementById('ev-title').value = '';
+        document.getElementById('ev-start').value = '09:00';
+        document.getElementById('ev-end').value = '10:00';
+        document.getElementById('ev-memo').value = '';
+        document.querySelector('#event-modal .form-actions .btn-primary').textContent = '追加する';
+      }
+
+      document.getElementById('event-modal').classList.add('open');
+      setTimeout(() => document.getElementById('ev-title').focus(), 100);
+    }
+
+    function closeEventModal() {
+      document.getElementById('event-modal').classList.remove('open');
+      editingEventId = null;
+    }
+
+    function openAddEvent() {
+      if (!viewingMember) return;
+      editingEventId = null;
+      selectedDate = todayStr();
+      openEventModal(selectedDate);
+    }
+
+    function editEvent(dateStr, eventId) {
+      const ev = (events[dateStr] || []).find(e => e.id === eventId);
+      if (!ev) return;
+      const member = getMember(ev.memberId);
+      if (member) viewingMember = member;
+
+      editingEventId = eventId;
+      selectedDate = dateStr;
+      document.getElementById('event-modal-title').textContent = '予定を編集';
+      document.getElementById('ev-title').value = ev.title;
+      document.getElementById('ev-start').value = ev.startTime;
+      document.getElementById('ev-end').value = ev.endTime;
+      document.getElementById('ev-memo').value = ev.memo || '';
+      document.querySelector('#event-modal .form-actions .btn-primary').textContent = '更新する';
+
+      closeDayModal();
+      openEventModal(dateStr);
+    }
+
+    async function saveEvent() {
+      const title = document.getElementById('ev-title').value.trim();
+      if (!title || !selectedDate || !viewingMember) return;
+
+      const data = {
+        date: selectedDate,
+        memberId: viewingMember.id,
+        title,
+        startTime: document.getElementById('ev-start').value,
+        endTime: document.getElementById('ev-end').value,
+        memo: document.getElementById('ev-memo').value.trim(),
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      };
+
+      try {
+        if (editingEventId) {
+          await db.collection('events').doc(editingEventId).update(data);
+        } else {
+          data.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+          await db.collection('events').add(data);
+        }
+        closeEventModal();
+      } catch (err) {
+        alert('保存に失敗しました: ' + err.message);
+      }
+    }
+
+    async function deleteEvent(dateStr, eventId) {
+      if (!confirm('この予定を削除しますか？')) return;
+      try {
+        await db.collection('events').doc(eventId).delete();
+        // Re-render day modal if open
+        const dayModal = document.getElementById('day-modal');
+        if (dayModal.classList.contains('open')) {
+          openDayModal(dateStr);
+        }
+      } catch (err) {
+        alert('削除に失敗しました: ' + err.message);
+      }
+    }
+
+    // ── Member Modal ──
+    function openMemberModal() {
+      renderMemberManageList();
+      document.getElementById('member-modal').classList.add('open');
+    }
+    function closeMemberModal() {
+      document.getElementById('member-modal').classList.remove('open');
+    }
+
+    function renderMemberManageList() {
+      const container = document.getElementById('member-manage-list');
+      if (!container) return;
+      container.innerHTML = members.map((m, i) => {
+        const c = getColor(i);
+        return `
+          <div class="member-manage-item" style="background:${c.bg};border:1px solid ${c.border}30">
+            <div class="member-manage-left">
+              <div class="member-manage-dot" style="background:${c.dot}"></div>
+              <span class="member-manage-name" style="color:${c.text}">${m.name}</span>
+              ${m.id === currentMember?.id ? `<span class="you-badge" style="background:${c.border}">あなた</span>` : ''}
+            </div>
+            <button class="event-action-btn delete" onclick="removeMember('${m.id}')">
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M2 4H12M5 4V2.5C5 2.2 5.2 2 5.5 2H8.5C8.8 2 9 2.2 9 2.5V4M3.5 4V12C3.5 12.3 3.7 12.5 4 12.5H10C10.3 12.5 10.5 12.3 10.5 12V4"/></svg>
+            </button>
+          </div>
+        `;
+      }).join('');
+    }
+
+    async function addMember() {
+      const name = document.getElementById('new-member-name').value.trim();
+      if (!name) return;
+      if (members.find(m => m.name === name)) { alert('同じ名前のメンバーが既に存在します'); return; }
+      try {
+        await db.collection('members').add({
+          name, createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        document.getElementById('new-member-name').value = '';
+      } catch (err) {
+        alert('追加に失敗しました: ' + err.message);
+      }
+    }
+
+    async function removeMember(id) {
+      if (!confirm('このメンバーを削除しますか？関連する予定も全て削除されます。')) return;
+      try {
+        // Delete member
+        await db.collection('members').doc(id).delete();
+        // Delete related events
+        const snap = await db.collection('events').where('memberId', '==', id).get();
+        const batch = db.batch();
+        snap.docs.forEach(d => batch.delete(d.ref));
+        await batch.commit();
+        if (viewingMember?.id === id) viewingMember = currentMember;
+      } catch (err) {
+        alert('削除に失敗しました: ' + err.message);
+      }
+    }
+
+    function refreshData() {
+      // Listeners auto-refresh, but force re-render
+      renderAll();
+    }
+
+    // ── Init ──
+    startListeners();
+    setTimeout(tryAutoLogin, 500);
+  </script>
+</body>
+</html>
