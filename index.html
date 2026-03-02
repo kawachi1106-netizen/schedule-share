@@ -349,14 +349,15 @@ select.form-input { font-family: inherit; appearance: auto; cursor: pointer; }
 .member-manage-left { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; }
 .member-manage-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
 .member-manage-name { font-size: 14px; font-weight: 600; }
-.color-swatches { display: flex; gap: 4px; align-items: center; }
+.color-swatches { display: flex; gap: 3px; align-items: center; flex-wrap: wrap; max-width: 200px; }
 .color-swatch {
-  width: 20px; height: 20px; border-radius: 50%; cursor: pointer;
+  width: 18px; height: 18px; border-radius: 50%; cursor: pointer;
   border: 2px solid transparent; transition: transform 0.1s;
   flex-shrink: 0;
 }
 .color-swatch:hover { transform: scale(1.2); }
 .color-swatch.selected { border-color: #1F2937; transform: scale(1.15); }
+.member-name-edit { transition: none; }
 .you-badge {
   font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 4px; color: #fff;
 }
@@ -567,9 +568,15 @@ select.form-input { font-family: inherit; appearance: auto; cursor: pointer; }
           <label class="form-label">対象メンバー（複数選択可）</label>
           <div id="ev-member-list" class="member-checkbox-list"></div>
         </div>
-        <div class="form-group">
-          <label class="form-label">日付</label>
-          <input class="form-input" type="date" id="ev-date">
+        <div class="form-row" id="ev-date-row">
+          <div class="form-group">
+            <label class="form-label">開始日</label>
+            <input class="form-input" type="date" id="ev-date">
+          </div>
+          <div class="form-group" id="ev-date-end-group">
+            <label class="form-label">終了日</label>
+            <input class="form-input" type="date" id="ev-date-end">
+          </div>
         </div>
         <div class="form-group">
           <label class="form-label">需要家名</label>
@@ -764,6 +771,14 @@ select.form-input { font-family: inherit; appearance: auto; cursor: pointer; }
       { bg:"#E0F7FA", border:"#00ACC1", text:"#006064", dot:"#00ACC1" },
       { bg:"#FFF3E0", border:"#FF7043", text:"#BF360C", dot:"#FF7043" },
       { bg:"#F1F8E9", border:"#7CB342", text:"#33691E", dot:"#7CB342" },
+      { bg:"#E8EAF6", border:"#3F51B5", text:"#1A237E", dot:"#3F51B5" },
+      { bg:"#FCE4EC", border:"#E91E63", text:"#880E4F", dot:"#E91E63" },
+      { bg:"#E0F2F1", border:"#009688", text:"#004D40", dot:"#009688" },
+      { bg:"#FFF8E1", border:"#FFC107", text:"#F57F17", dot:"#FFC107" },
+      { bg:"#EFEBE9", border:"#795548", text:"#3E2723", dot:"#795548" },
+      { bg:"#F3E5F5", border:"#AB47BC", text:"#6A1B9A", dot:"#AB47BC" },
+      { bg:"#E1F5FE", border:"#03A9F4", text:"#01579B", dot:"#03A9F4" },
+      { bg:"#F9FBE7", border:"#827717", text:"#524A0A", dot:"#827717" },
     ];
 
     // ── State ──
@@ -1139,7 +1154,11 @@ select.form-input { font-family: inherit; appearance: auto; cursor: pointer; }
                   ${ev.memo ? `<div class="event-card-info" style="margin-top:4px">📝 ${ev.memo}</div>` : ''}
                 </div>
                 <div class="event-card-actions">
-                  <button class="event-action-btn" style="border:1px solid ${c.border}40;color:${c.text}"
+                  <button class="event-action-btn" style="border:1px solid ${c.border}40;color:${c.text}" title="コピー"
+                    onclick="copyEvent('${dateStr}','${ev.id}')">
+                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><rect x="4" y="4" width="8" height="8" rx="1"/><path d="M10 4V2.5C10 2.2 9.8 2 9.5 2H2.5C2.2 2 2 2.2 2 2.5V9.5C2 9.8 2.2 10 2.5 10H4"/></svg>
+                  </button>
+                  <button class="event-action-btn" style="border:1px solid ${c.border}40;color:${c.text}" title="編集"
                     onclick="editEvent('${dateStr}','${ev.id}')">
                     <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M8.5 2.5L11.5 5.5M1.5 10.5L1 13L3.5 12.5L12 4L10 2L1.5 10.5Z"/></svg>
                   </button>
@@ -1260,6 +1279,8 @@ select.form-input { font-family: inherit; appearance: auto; cursor: pointer; }
       if (!editingEventId) {
         populateMemberCheckboxes([defaultMember]);
         document.getElementById('ev-date').value = dateStr;
+        document.getElementById('ev-date-end').value = dateStr;
+        document.getElementById('ev-date-end-group').style.display = 'block';
         document.getElementById('event-modal-title').textContent = '予定を追加';
         document.getElementById('ev-title').value = '';
         document.getElementById('ev-customer').value = '';
@@ -1301,12 +1322,50 @@ select.form-input { font-family: inherit; appearance: auto; cursor: pointer; }
       document.getElementById('ev-allday').checked = !!ev.allDay;
       document.getElementById('ev-time-row').style.display = ev.allDay ? 'none' : 'flex';
       document.getElementById('ev-memo').value = ev.memo || '';
+      document.getElementById('ev-date-end-group').style.display = 'none';
       document.querySelector('#event-modal .form-actions .btn-primary').textContent = '更新する';
 
       closeDayModal();
       populateMemberCheckboxes([ev.memberId]);
       document.getElementById('ev-date').value = dateStr;
       openEventModal(dateStr);
+    }
+
+    function copyEvent(dateStr, eventId) {
+      const ev = (events[dateStr] || []).find(e => e.id === eventId);
+      if (!ev) return;
+
+      editingEventId = null;
+      selectedDate = dateStr;
+      document.getElementById('event-modal-title').textContent = '予定をコピー';
+      document.getElementById('ev-title').value = ev.title;
+      document.getElementById('ev-customer').value = ev.customer || '';
+      document.getElementById('ev-start').value = ev.startTime || '09:00';
+      document.getElementById('ev-end').value = ev.endTime || '10:00';
+      document.getElementById('ev-allday').checked = !!ev.allDay;
+      document.getElementById('ev-time-row').style.display = ev.allDay ? 'none' : 'flex';
+      document.getElementById('ev-memo').value = ev.memo || '';
+      document.getElementById('ev-date-end-group').style.display = 'block';
+      document.querySelector('#event-modal .form-actions .btn-primary').textContent = '追加する';
+
+      closeDayModal();
+      populateMemberCheckboxes([ev.memberId]);
+      document.getElementById('ev-date').value = dateStr;
+      document.getElementById('ev-date-end').value = dateStr;
+      openEventModal(dateStr);
+    }
+
+    function getDateRange(startStr, endStr) {
+      const dates = [];
+      const s = new Date(startStr);
+      const e = new Date(endStr);
+      if (isNaN(s) || isNaN(e) || e < s) return [startStr];
+      const cur = new Date(s);
+      while (cur <= e) {
+        dates.push(formatDate(cur.getFullYear(), cur.getMonth(), cur.getDate()));
+        cur.setDate(cur.getDate() + 1);
+      }
+      return dates;
     }
 
     async function saveEvent() {
@@ -1343,23 +1402,27 @@ select.form-input { font-family: inherit; appearance: auto; cursor: pointer; }
             await db.collection('events').doc(editingEventId).update(data);
           }
           const mName = getMember(firstId)?.name || '不明';
-          await writeLog('edit', `${mName}の「${title}」を編集`, date);
+          await writeLog('edit', `${mName}の「${customer || title}」を編集`, date);
           for (let i = 1; i < memberIds.length; i++) {
             await db.collection('events').add({
               ...baseData, date, memberId: memberIds[i],
               createdAt: firebase.firestore.FieldValue.serverTimestamp(),
             });
             const mn = getMember(memberIds[i])?.name || '不明';
-            await writeLog('add', `${mn}の「${title}」を追加`, date);
+            await writeLog('add', `${mn}の「${customer || title}」を追加`, date);
           }
         } else {
-          for (const memberId of memberIds) {
-            await db.collection('events').add({
-              ...baseData, date, memberId,
-              createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-            });
-            const mName = getMember(memberId)?.name || '不明';
-            await writeLog('add', `${mName}の「${title}」を追加`, date);
+          const dateEnd = document.getElementById('ev-date-end').value || date;
+          const dates = getDateRange(date, dateEnd);
+          for (const d of dates) {
+            for (const memberId of memberIds) {
+              await db.collection('events').add({
+                ...baseData, date: d, memberId,
+                createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+              });
+              const mName = getMember(memberId)?.name || '不明';
+              await writeLog('add', `${mName}の「${customer || title}」を追加`, d);
+            }
           }
         }
         closeEventModal();
@@ -1409,8 +1472,16 @@ select.form-input { font-family: inherit; appearance: auto; cursor: pointer; }
           <div class="member-manage-item" style="background:${c.bg};border:1px solid ${c.border}30">
             <div class="member-manage-left">
               <div class="member-manage-dot" style="background:${c.dot}"></div>
-              <span class="member-manage-name" style="color:${c.text}">${m.name}</span>
+              <span class="member-manage-name" style="color:${c.text}" id="mname-${m.id}" ondblclick="startEditName('${m.id}')">${m.name}</span>
+              <input class="form-input member-name-edit hidden" id="mname-input-${m.id}"
+                value="${m.name}" style="font-size:13px;padding:4px 8px;margin:0;width:100px"
+                onkeydown="if(event.key==='Enter')saveNameEdit('${m.id}');if(event.key==='Escape')cancelNameEdit('${m.id}')"
+                onblur="saveNameEdit('${m.id}')">
               ${m.id === currentMember?.id ? `<span class="you-badge" style="background:${c.border}">あなた</span>` : ''}
+              <button class="event-action-btn" style="border:1px solid ${c.border}40;color:${c.text};padding:3px" title="名前を編集"
+                onclick="startEditName('${m.id}')">
+                <svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M8.5 2.5L11.5 5.5M1.5 10.5L1 13L3.5 12.5L12 4L10 2L1.5 10.5Z"/></svg>
+              </button>
             </div>
             <div class="color-swatches">${swatches}</div>
             <button class="event-action-btn delete" onclick="removeMember('${m.id}')">
@@ -1419,6 +1490,48 @@ select.form-input { font-family: inherit; appearance: auto; cursor: pointer; }
           </div>
         `;
       }).join('');
+    }
+
+    function startEditName(id) {
+      document.getElementById('mname-' + id).classList.add('hidden');
+      const input = document.getElementById('mname-input-' + id);
+      input.classList.remove('hidden');
+      input.focus();
+      input.select();
+    }
+
+    function cancelNameEdit(id) {
+      const m = getMember(id);
+      const input = document.getElementById('mname-input-' + id);
+      input.value = m ? m.name : '';
+      input.classList.add('hidden');
+      document.getElementById('mname-' + id).classList.remove('hidden');
+    }
+
+    async function saveNameEdit(id) {
+      const input = document.getElementById('mname-input-' + id);
+      if (input.classList.contains('hidden')) return;
+      const newName = input.value.trim();
+      const m = getMember(id);
+      if (!newName || newName === m?.name) {
+        cancelNameEdit(id);
+        return;
+      }
+      if (members.find(x => x.name === newName && x.id !== id)) {
+        alert('同じ名前のメンバーが既に存在します');
+        cancelNameEdit(id);
+        return;
+      }
+      try {
+        await db.collection('members').doc(id).update({ name: newName });
+        if (currentMember?.id === id) {
+          localStorage.setItem('schedule-user', newName);
+        }
+        await writeLog('member', `メンバー名を「${m.name}」→「${newName}」に変更`);
+      } catch (err) {
+        alert('名前の変更に失敗しました: ' + err.message);
+        cancelNameEdit(id);
+      }
     }
 
     async function changeMemberColor(id, colorIndex) {
