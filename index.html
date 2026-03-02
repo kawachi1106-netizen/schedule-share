@@ -342,12 +342,21 @@ select.form-input { font-family: inherit; appearance: auto; cursor: pointer; }
 
 /* ── Member Management ── */
 .member-manage-item {
-  display: flex; align-items: center; justify-content: space-between;
+  display: flex; align-items: center; gap: 8px;
   padding: 10px 12px; border-radius: var(--radius); margin-bottom: 6px;
+  flex-wrap: wrap;
 }
-.member-manage-left { display: flex; align-items: center; gap: 8px; }
-.member-manage-dot { width: 10px; height: 10px; border-radius: 50%; }
+.member-manage-left { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; }
+.member-manage-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
 .member-manage-name { font-size: 14px; font-weight: 600; }
+.color-swatches { display: flex; gap: 4px; align-items: center; }
+.color-swatch {
+  width: 20px; height: 20px; border-radius: 50%; cursor: pointer;
+  border: 2px solid transparent; transition: transform 0.1s;
+  flex-shrink: 0;
+}
+.color-swatch:hover { transform: scale(1.2); }
+.color-swatch.selected { border-color: #1F2937; transform: scale(1.15); }
 .you-badge {
   font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 4px; color: #fff;
 }
@@ -770,7 +779,17 @@ select.form-input { font-family: inherit; appearance: auto; cursor: pointer; }
     let unsubMembers = null;
     let unsubEvents = null;
 
-    function getColor(idx) { return MEMBER_COLORS[idx % MEMBER_COLORS.length]; }
+    function getColor(idx, member) {
+      if (member && member.colorIndex !== undefined) {
+        return MEMBER_COLORS[member.colorIndex % MEMBER_COLORS.length];
+      }
+      return MEMBER_COLORS[idx % MEMBER_COLORS.length];
+    }
+    function getMemberColor(memberId) {
+      const m = getMember(memberId);
+      const i = getMemberIndex(memberId);
+      return getColor(i >= 0 ? i : 0, m);
+    }
     function getMemberIndex(id) { return members.findIndex(m => m.id === id); }
     function getMember(id) { return members.find(m => m.id === id); }
     function formatDate(y, m, d) {
@@ -863,7 +882,7 @@ select.form-input { font-family: inherit; appearance: auto; cursor: pointer; }
       if (members.length === 0) { group.style.display = 'none'; return; }
       group.style.display = 'block';
       container.innerHTML = members.map((m, i) => {
-        const c = getColor(i);
+        const c = getColor(i, m);
         return `<button class="member-tag" onclick="document.getElementById('login-name').value='${m.name}'"
           style="border-color:${c.border};color:${c.text}">${m.name}</button>`;
       }).join('');
@@ -906,7 +925,7 @@ select.form-input { font-family: inherit; appearance: auto; cursor: pointer; }
       const el = document.getElementById('user-badge');
       if (!currentMember) { el.innerHTML = ''; return; }
       const i = getMemberIndex(currentMember.id);
-      const c = getColor(i >= 0 ? i : 0);
+      const c = getColor(i >= 0 ? i : 0, currentMember);
       el.style.background = c.bg;
       el.style.color = c.text;
       el.innerHTML = `<div class="dot" style="background:${c.dot}"></div>${currentMember.name}`;
@@ -921,7 +940,7 @@ select.form-input { font-family: inherit; appearance: auto; cursor: pointer; }
     function renderMemberList() {
       const container = document.getElementById('member-list');
       container.innerHTML = members.map((m, i) => {
-        const c = getColor(i);
+        const c = getColor(i, m);
         const isViewing = viewingMember?.id === m.id;
         const isFiltered = filterSet.has(m.id);
         return `
@@ -978,7 +997,7 @@ select.form-input { font-family: inherit; appearance: auto; cursor: pointer; }
       }
       el.classList.remove('hidden');
       const i = getMemberIndex(viewingMember.id);
-      const c = getColor(i >= 0 ? i : 0);
+      const c = getColor(i >= 0 ? i : 0, viewingMember);
       el.style.background = c.bg;
       el.style.color = c.text;
       el.style.border = `1px solid ${c.border}40`;
@@ -1025,8 +1044,7 @@ select.form-input { font-family: inherit; appearance: auto; cursor: pointer; }
         }
         html += '<div class="cal-events">';
         dayEvents.slice(0, 3).forEach(ev => {
-          const mi = getMemberIndex(ev.memberId);
-          const c = getColor(mi >= 0 ? mi : 0);
+          const c = getMemberColor(ev.memberId);
           html += `<div class="event-chip" style="background:${c.bg};color:${c.text};border-left-color:${c.border}">${ev.customer || ev.title}</div>`;
         });
         if (dayEvents.length > 3) {
@@ -1107,8 +1125,7 @@ select.form-input { font-family: inherit; appearance: auto; cursor: pointer; }
       </div>`;
 
       dayEvents.forEach(ev => {
-        const mi = getMemberIndex(ev.memberId);
-        const c = getColor(mi >= 0 ? mi : 0);
+        const c = getMemberColor(ev.memberId);
         const member = getMember(ev.memberId);
         html += `
           <div class="event-card-row">
@@ -1197,7 +1214,7 @@ select.form-input { font-family: inherit; appearance: auto; cursor: pointer; }
       if (!Array.isArray(selectedIds)) selectedIds = selectedIds ? [selectedIds] : [];
       const container = document.getElementById('ev-member-list');
       container.innerHTML = members.map((m, i) => {
-        const c = getColor(i);
+        const c = getColor(i, m);
         const checked = selectedIds.includes(m.id);
         return `
           <label class="member-checkbox-item ${checked ? 'checked' : ''}" id="mcb-${m.id}"
@@ -1216,7 +1233,7 @@ select.form-input { font-family: inherit; appearance: auto; cursor: pointer; }
     function onMemberCheckChange(memberId, colorIndex) {
       const label = document.getElementById('mcb-' + memberId);
       const input = label.querySelector('input');
-      const c = getColor(colorIndex);
+      const c = getMemberColor(memberId);
       if (input.checked) {
         label.classList.add('checked');
         label.style.background = c.bg;
@@ -1382,7 +1399,12 @@ select.form-input { font-family: inherit; appearance: auto; cursor: pointer; }
       const container = document.getElementById('member-manage-list');
       if (!container) return;
       container.innerHTML = members.map((m, i) => {
-        const c = getColor(i);
+        const c = getColor(i, m);
+        const swatches = MEMBER_COLORS.map((clr, ci) => {
+          const selected = (m.colorIndex !== undefined ? m.colorIndex : i) % MEMBER_COLORS.length === ci;
+          return `<div class="color-swatch ${selected ? 'selected' : ''}"
+            style="background:${clr.dot}" onclick="event.stopPropagation();changeMemberColor('${m.id}',${ci})"></div>`;
+        }).join('');
         return `
           <div class="member-manage-item" style="background:${c.bg};border:1px solid ${c.border}30">
             <div class="member-manage-left">
@@ -1390,12 +1412,21 @@ select.form-input { font-family: inherit; appearance: auto; cursor: pointer; }
               <span class="member-manage-name" style="color:${c.text}">${m.name}</span>
               ${m.id === currentMember?.id ? `<span class="you-badge" style="background:${c.border}">あなた</span>` : ''}
             </div>
+            <div class="color-swatches">${swatches}</div>
             <button class="event-action-btn delete" onclick="removeMember('${m.id}')">
               <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M2 4H12M5 4V2.5C5 2.2 5.2 2 5.5 2H8.5C8.8 2 9 2.2 9 2.5V4M3.5 4V12C3.5 12.3 3.7 12.5 4 12.5H10C10.3 12.5 10.5 12.3 10.5 12V4"/></svg>
             </button>
           </div>
         `;
       }).join('');
+    }
+
+    async function changeMemberColor(id, colorIndex) {
+      try {
+        await db.collection('members').doc(id).update({ colorIndex });
+      } catch (err) {
+        alert('色の変更に失敗しました: ' + err.message);
+      }
     }
 
     async function addMember() {
