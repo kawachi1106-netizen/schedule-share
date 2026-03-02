@@ -197,6 +197,12 @@ body {
 .cal-day.sat { color: #2563EB; }
 
 .cal-events { display: flex; flex-direction: column; gap: 2px; overflow: hidden; min-width: 0; }
+.holiday-label {
+  font-size: 9px; color: var(--danger); font-weight: 600;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  margin-bottom: 1px;
+}
+.cal-cell.holiday { background: #FFF5F5; }
 .event-chip {
   padding: 3px 6px; border-radius: 4px; font-size: 11px; font-weight: 600;
   border-left: 3px solid; white-space: nowrap; overflow: hidden;
@@ -664,6 +670,82 @@ select.form-input { font-family: inherit; appearance: auto; cursor: pointer; }
 
     // ── Constants ──
     const DAYS_JP = ["日","月","火","水","木","金","土"];
+
+    // ── 日本の祝日 ──
+    function getHolidays(year) {
+      const holidays = {};
+      const add = (m, d, name) => { holidays[formatDate(year, m, d)] = name; };
+
+      // 固定祝日
+      add(0, 1, '元日');
+      add(1, 11, '建国記念の日');
+      add(1, 23, '天皇誕生日');
+      add(3, 29, '昭和の日');
+      add(4, 3, '憲法記念日');
+      add(4, 4, 'みどりの日');
+      add(4, 5, 'こどもの日');
+      add(7, 11, '山の日');
+      add(10, 3, '文化の日');
+      add(10, 23, '勤労感謝の日');
+
+      // ハッピーマンデー
+      const nthMonday = (m, n) => {
+        let d = 1, count = 0;
+        while (count < n) {
+          if (new Date(year, m, d).getDay() === 1) count++;
+          if (count < n) d++;
+        }
+        return d;
+      };
+      add(0, nthMonday(0, 2), '成人の日');
+      add(6, nthMonday(6, 3), '海の日');
+      add(8, nthMonday(8, 3), '敬老の日');
+      add(9, nthMonday(9, 2), 'スポーツの日');
+
+      // 春分の日・秋分の日（近似計算）
+      const springEquinox = Math.floor(20.8431 + 0.242194 * (year - 1980) - Math.floor((year - 1980) / 4));
+      const autumnEquinox = Math.floor(23.2488 + 0.242194 * (year - 1980) - Math.floor((year - 1980) / 4));
+      add(2, springEquinox, '春分の日');
+      add(8, autumnEquinox, '秋分の日');
+
+      // 振替休日（祝日が日曜→翌月曜）
+      const keys = Object.keys(holidays);
+      keys.forEach(dateStr => {
+        const p = parseDate(dateStr);
+        const dow = new Date(p.year, p.month, p.day).getDay();
+        if (dow === 0) {
+          let nd = p.day + 1;
+          let nKey = formatDate(p.year, p.month, nd);
+          while (holidays[nKey]) { nd++; nKey = formatDate(p.year, p.month, nd); }
+          holidays[nKey] = '振替休日';
+        }
+      });
+
+      // 国民の休日（祝日に挟まれた平日）
+      const allDates = Object.keys(holidays).sort();
+      for (let i = 0; i < allDates.length - 1; i++) {
+        const d1 = parseDate(allDates[i]);
+        const d2 = parseDate(allDates[i + 1]);
+        const t1 = new Date(d1.year, d1.month, d1.day);
+        const t2 = new Date(d2.year, d2.month, d2.day);
+        if ((t2 - t1) === 2 * 86400000) {
+          const mid = new Date(t1.getTime() + 86400000);
+          const midStr = formatDate(mid.getFullYear(), mid.getMonth(), mid.getDate());
+          if (!holidays[midStr] && mid.getDay() !== 0) {
+            holidays[midStr] = '国民の休日';
+          }
+        }
+      }
+
+      return holidays;
+    }
+
+    let holidayCache = {};
+    function getHolidayName(dateStr) {
+      const p = parseDate(dateStr);
+      if (!holidayCache[p.year]) holidayCache[p.year] = getHolidays(p.year);
+      return holidayCache[p.year][dateStr] || null;
+    }
     const MEMBER_COLORS = [
       { bg:"#E8F0FE", border:"#4285F4", text:"#1A56DB", dot:"#4285F4" },
       { bg:"#FEF3E2", border:"#F5A623", text:"#B7791F", dot:"#F5A623" },
@@ -933,10 +1015,14 @@ select.form-input { font-family: inherit; appearance: auto; cursor: pointer; }
         const dow = (firstDay + d - 1) % 7;
         const isToday = dateStr === today;
         const dayEvents = getFilteredEvents(dateStr);
+        const holiday = getHolidayName(dateStr);
 
-        let dayClass = dow === 0 ? 'sun' : dow === 6 ? 'sat' : '';
-        html += `<div class="cal-cell ${isToday ? 'today' : ''}" onclick="onDayClick('${dateStr}')">`;
+        let dayClass = (dow === 0 || holiday) ? 'sun' : dow === 6 ? 'sat' : '';
+        html += `<div class="cal-cell ${isToday ? 'today' : ''} ${holiday ? 'holiday' : ''}" onclick="onDayClick('${dateStr}')">`;
         html += `<div class="cal-day ${dayClass} ${isToday ? 'today' : ''}">${d}</div>`;
+        if (holiday) {
+          html += `<div class="holiday-label">${holiday}</div>`;
+        }
         html += '<div class="cal-events">';
         dayEvents.slice(0, 3).forEach(ev => {
           const mi = getMemberIndex(ev.memberId);
