@@ -1421,6 +1421,23 @@ select.form-input { font-family: inherit; appearance: auto; cursor: pointer; }
       renderAll();
     }
 
+    // ── Touch Swipe ──
+    let touchStartX = 0;
+    let touchStartY = 0;
+    const calGrid = document.getElementById('cal-grid');
+    calGrid.addEventListener('touchstart', e => {
+      touchStartX = e.touches[0].clientX;
+      touchStartY = e.touches[0].clientY;
+    }, { passive: true });
+    calGrid.addEventListener('touchend', e => {
+      const dx = e.changedTouches[0].clientX - touchStartX;
+      const dy = e.changedTouches[0].clientY - touchStartY;
+      if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy)) {
+        if (dx < 0) nextMonth();
+        else prevMonth();
+      }
+    }, { passive: true });
+
     // ── Init ──
     startListeners();
     setTimeout(tryAutoLogin, 500);
