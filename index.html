@@ -940,7 +940,7 @@ select.form-input { font-family: inherit; appearance: auto; cursor: pointer; }
         dayEvents.slice(0, 3).forEach(ev => {
           const mi = getMemberIndex(ev.memberId);
           const c = getColor(mi >= 0 ? mi : 0);
-          html += `<div class="event-chip" style="background:${c.bg};color:${c.text};border-left-color:${c.border}">${ev.customer ? ev.customer + ' ' + ev.title : ev.title}</div>`;
+          html += `<div class="event-chip" style="background:${c.bg};color:${c.text};border-left-color:${c.border}">${ev.customer || ev.title}</div>`;
         });
         if (dayEvents.length > 3) {
           html += `<div class="more-events">+${dayEvents.length - 3}件</div>`;
