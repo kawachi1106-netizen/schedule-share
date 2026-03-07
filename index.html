@@ -179,7 +179,7 @@
 
     .cal-week {
       display: grid; grid-template-columns: repeat(7, minmax(0, 1fr));
-      flex: 1;
+      flex: 1; overflow: hidden;
     }
     .cal-cell {
       min-height: 0; padding: 3px 5px;
@@ -218,7 +218,7 @@
       -webkit-user-select: none; user-select: none; -webkit-touch-callout: none;
     }
     .event-chip.multi-bar {
-      position: relative; z-index: 3;
+      position: relative; z-index: 1;
       border-left: 3px solid;
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
       overflow: visible;
@@ -398,26 +398,12 @@
       font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 4px; color: #fff;
     }
 
-    /* ── Connection Status ── */
-    .conn-status {
-      position: fixed; bottom: 16px; right: 16px; padding: 8px 14px;
-      border-radius: 20px; font-size: 12px; font-weight: 600;
-      z-index: 50; box-shadow: var(--shadow-md); display: flex;
-      align-items: center; gap: 6px; transition: opacity 0.3s;
-    }
-    .conn-status .pulse {
-      width: 8px; height: 8px; border-radius: 50%; animation: pulse 2s infinite;
-    }
-    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
-    .conn-status.online { background: #E6F9EF; color: #276749; }
-    .conn-status.online .pulse { background: #34A853; }
-    .conn-status.offline { background: var(--danger-bg); color: var(--danger); }
-    .conn-status.offline .pulse { background: var(--danger); }
-
     .empty-msg { color: var(--text-muted); font-size: 13px; text-align: center; padding: 20px; }
 
     /* ── Mobile ── */
     @media (max-width: 768px) {
+      body { height: auto; overflow: auto; }
+      .layout { height: auto; overflow: visible; }
       .sidebar {
         position: fixed; left: 0; top: 44px; bottom: 0; z-index: 900;
         transform: translateX(-100%); transition: transform 0.25s ease;
@@ -427,12 +413,13 @@
         display: block; position: fixed; inset: 0; top: 44px;
         z-index: 899; background: rgba(0,0,0,0.3);
       }
-      .cal-cell { min-height: 60px; padding: 3px 2px; }
-      .cal-day { width: 22px; height: 22px; font-size: 11px; }
-      .event-chip { font-size: 9px; padding: 1px 3px; }
-      .event-chip.multi-bar { font-size: 9px; padding: 1px 3px; height: 16px; }
-      .event-chip.placeholder { height: 16px; }
+      .cal-cell { min-height: 60px; padding: 2px 1px; overflow: hidden; }
+      .cal-day { width: 20px; height: 20px; font-size: 10px; }
+      .event-chip { font-size: 8px; padding: 1px 2px; z-index: auto; }
+      .event-chip.multi-bar { font-size: 8px; padding: 1px 2px; height: 14px; z-index: auto; overflow: hidden; }
+      .event-chip.placeholder { height: 14px; }
       .month-nav h2 { font-size: 17px; min-width: 120px; }
+      .holiday-label { font-size: 7px; }
     }
 
     /* ── Loading Spinner ── */
@@ -533,11 +520,6 @@
       </main>
     </div>
 
-    <!-- Connection Status -->
-    <div id="conn-status" class="conn-status online">
-      <div class="pulse"></div>
-      <span>接続中</span>
-    </div>
   </div>
 
   <!-- Context Menu -->
@@ -930,16 +912,7 @@
       setConnStatus(true);
     }
 
-    function setConnStatus(online) {
-      const el = document.getElementById('conn-status');
-      if (online) {
-        el.className = 'conn-status online';
-        el.innerHTML = '<div class="pulse"></div><span>リアルタイム同期中</span>';
-      } else {
-        el.className = 'conn-status offline';
-        el.innerHTML = '<div class="pulse"></div><span>接続エラー</span>';
-      }
-    }
+    function setConnStatus(online) { /* removed */ }
 
     // ── Login ──
     async function handleLogin() {
@@ -1809,8 +1782,10 @@
     }
 
     function refreshData() {
-      // Listeners auto-refresh, but force re-render
-      renderAll();
+      // Restart listeners to force data refetch
+      if (unsubMembers) unsubMembers();
+      if (unsubEvents) unsubEvents();
+      startListeners();
     }
 
     // ── Backup ──
