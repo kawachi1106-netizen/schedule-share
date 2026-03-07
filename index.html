@@ -494,6 +494,9 @@
           ✓ 名前タップで表示/非表示を切替<br>
           ✓ 日付クリックで予定を追加
         </div>
+        <div style="margin-top:12px">
+          <button class="sidebar-add-btn" style="width:100%;justify-content:center" onclick="openAdminModal();toggleSidebar()">⚙ 管理メニュー</button>
+        </div>
       </aside>
 
       <!-- Main -->
@@ -509,7 +512,6 @@
             </button>
           </div>
           <div class="month-nav-right">
-            <button class="btn btn-secondary btn-sm" onclick="openAdminModal()">⚙ 管理</button>
             <button class="btn btn-secondary btn-sm" onclick="goToday()">今日</button>
             <button id="add-event-btn" class="btn btn-primary btn-sm btn-icon" onclick="openAddEvent()">
               <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M7 3V11M3 7H11"/></svg>
