@@ -37,7 +37,7 @@
       font-family: 'Noto Sans JP', sans-serif;
       background: var(--bg);
       color: var(--text-primary);
-      height: 100vh; overflow: hidden;
+      height: 100vh; overflow: auto;
       -webkit-font-smoothing: antialiased;
     }
 
@@ -75,13 +75,14 @@
     .user-badge .dot { width: 8px; height: 8px; border-radius: 50%; }
 
     /* ── Layout ── */
-    .layout { display: flex; position: relative; height: calc(100vh - 44px); overflow: hidden; }
+    .layout { display: flex; position: relative; min-height: calc(100vh - 44px); }
 
     /* ── Sidebar ── */
     .sidebar {
       width: 200px; background: var(--surface);
       border-right: 1px solid var(--border);
       padding: 12px; flex-shrink: 0; overflow-y: auto;
+      position: sticky; top: 44px; height: calc(100vh - 44px);
     }
     .sidebar-header {
       display: flex; align-items: center; justify-content: space-between;
@@ -134,7 +135,6 @@
     /* ── Main ── */
     .main {
       flex: 1; padding: 8px 12px 4px; width: 100%;
-      display: flex; flex-direction: column; min-height: 0;
     }
     .month-nav {
       display: flex; align-items: center; justify-content: space-between;
@@ -161,10 +161,8 @@
     .calendar {
       background: var(--surface); border-radius: var(--radius-lg);
       border: 1px solid var(--border); overflow: hidden; box-shadow: var(--shadow-sm);
-      flex: 1; display: flex; flex-direction: column; min-height: 0;
     }
     .cal-grid {
-      flex: 1; display: flex; flex-direction: column;
       -webkit-user-select: none; user-select: none;
     }
     .cal-header {
@@ -181,10 +179,9 @@
 
     .cal-week {
       display: grid; grid-template-columns: repeat(7, minmax(0, 1fr));
-      flex: 1; overflow: hidden;
     }
     .cal-cell {
-      min-height: 0; padding: 3px 5px;
+      min-height: 40px; padding: 3px 5px;
       border-right: 1px solid var(--border-light);
       border-bottom: 1px solid var(--border-light);
       cursor: pointer; transition: background 0.1s;
@@ -1236,7 +1233,7 @@
             const de = ev.dateEnd || ev.date;
             return ds === de;
           });
-          const maxVisible = 6;
+          const maxVisible = 10;
           const singleSlots = Math.max(0, maxVisible - usedSlots);
           singleEvents.slice(0, singleSlots).forEach(ev => {
             const c = getMemberColor(ev.memberId);
@@ -1253,18 +1250,6 @@
       }
 
       document.getElementById('cal-grid').innerHTML = html;
-      // Auto-fit cell height to viewport
-      requestAnimationFrame(() => {
-        const grid = document.getElementById('cal-grid');
-        const header = document.querySelector('.cal-header');
-        const nav = document.querySelector('.month-nav');
-        const topBar = document.querySelector('.header');
-        const usedH = (topBar ? topBar.offsetHeight : 44) + (nav ? nav.offsetHeight : 40) + (header ? header.offsetHeight : 30) + 24;
-        const availH = window.innerHeight - usedH;
-        const weekRows = grid.querySelectorAll('.cal-week').length || 1;
-        const cellH = Math.max(60, Math.floor(availH / weekRows));
-        grid.querySelectorAll('.cal-cell:not(.empty)').forEach(c => c.style.minHeight = cellH + 'px');
-      });
     }
 
     function getFilteredEvents(dateStr) {
