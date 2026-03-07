@@ -11,6 +11,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <style>
     :root {
+      --cell-gap: 11px;
       --bg: #F8FAFC;
       --surface: #FFFFFF;
       --border: #E2E8F0;
@@ -403,6 +404,7 @@
 
     /* ── Mobile ── */
     @media (max-width: 768px) {
+      :root { --cell-gap: 3px; }
       body { height: auto; overflow: auto; }
       .layout { height: auto; overflow: visible; }
       .sidebar {
@@ -414,10 +416,10 @@
         display: block; position: fixed; inset: 0; top: 44px;
         z-index: 899; background: rgba(0,0,0,0.3);
       }
-      .cal-cell { min-height: 60px; padding: 2px 1px; overflow: hidden; }
+      .cal-cell { min-height: 60px; padding: 2px 1px; overflow: visible; }
       .cal-day { width: 20px; height: 20px; font-size: 10px; }
-      .event-chip { font-size: 8px; padding: 1px 2px; z-index: auto; }
-      .event-chip.multi-bar { font-size: 8px; padding: 1px 2px; height: 14px; z-index: auto; overflow: hidden; }
+      .event-chip { font-size: 8px; padding: 1px 2px; }
+      .event-chip.multi-bar { font-size: 8px; padding: 1px 2px; height: 14px; }
       .event-chip.placeholder { height: 14px; }
       .month-nav h2 { font-size: 17px; min-width: 120px; }
       .holiday-label { font-size: 7px; }
@@ -1081,6 +1083,7 @@
       const firstDay = new Date(currentYear, currentMonth, 1).getDay();
       const today = todayStr();
       const rows = Math.ceil((firstDay + daysInMonth) / 7);
+      const cellGap = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--cell-gap')) || 11;
 
       // Build date map for each cell
       function cellDate(week, col) {
@@ -1179,7 +1182,7 @@
               if (!item.isStart && !item.isEnd) cls = 'cont-mid';
               else if (!item.isStart) cls = 'cont-end';
               else if (!item.isEnd) cls = 'cont-start';
-              const w = `calc(${span} * 100% + ${(span - 1) * 1}px + ${(span - 1) * 12}px)`;
+              const w = `calc(${span} * 100% + ${(span - 1) * (1 + cellGap)}px)`;
               html += `<div class="event-chip multi-bar ${cls}" style="width:${w};background:${c.bg};color:${c.text};border-left-color:${c.border}" onclick="event.stopPropagation();onDayClick('${item.ev.dateStart || item.ev.date}')" oncontextmenu="showCtxMenu(event,'${item.ev.dateStart || item.ev.date}','${item.ev.id}')" title="${label}">${item.isStart || col === 0 ? label : ''}</div>`;
             } else if (occupied) {
               html += '<div class="event-chip placeholder">.</div>';
