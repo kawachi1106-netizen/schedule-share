@@ -834,6 +834,7 @@
     let currentMember = null;
     let viewingMember = null;
     let filterSet = new Set();
+    let filterInitialized = false;
     let currentYear = new Date().getFullYear();
     let currentMonth = new Date().getMonth();
     let selectedDate = null;
@@ -873,7 +874,18 @@
       unsubMembers = db.collection('members').orderBy('createdAt')
         .onSnapshot(snap => {
           members = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-          filterSet = new Set(members.map(m => m.id));
+          if (!filterInitialized) {
+            if (currentMember) {
+              filterSet = new Set([currentMember.id]);
+              filterInitialized = true;
+            } else {
+              filterSet = new Set(members.map(m => m.id));
+            }
+          } else {
+            // Keep existing filter, but remove deleted members
+            const validIds = new Set(members.map(m => m.id));
+            filterSet = new Set([...filterSet].filter(id => validIds.has(id)));
+          }
           renderMemberList();
           renderLoginMembers();
           renderCalendar();
@@ -931,6 +943,8 @@
       }
       currentMember = existing;
       viewingMember = existing;
+      filterSet = new Set([existing.id]);
+      filterInitialized = true;
       localStorage.setItem('schedule-user', name);
       document.getElementById('login-modal').classList.remove('open');
       document.getElementById('app').classList.remove('hidden');
@@ -962,6 +976,8 @@
             clearInterval(check);
             currentMember = existing;
             viewingMember = existing;
+            filterSet = new Set([existing.id]);
+            filterInitialized = true;
             document.getElementById('login-modal').classList.remove('open');
             document.getElementById('app').classList.remove('hidden');
             document.getElementById('loading-screen').classList.add('hidden');
