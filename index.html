@@ -173,29 +173,13 @@
 
     .cal-week {
       display: grid; grid-template-columns: repeat(7, minmax(0, 1fr));
-      position: relative;
     }
-    .cal-week-spans {
-      position: absolute; top: 32px; left: 0; right: 0; z-index: 2;
-      pointer-events: none;
-    }
-    .span-bar {
-      position: absolute; height: 20px; border-radius: 4px;
-      font-size: 11px; font-weight: 600; line-height: 20px;
-      padding: 0 6px; white-space: nowrap; overflow: hidden;
-      text-overflow: ellipsis; cursor: pointer; pointer-events: auto;
-    }
-    .span-bar.span-start { border-radius: 4px 0 0 4px; }
-    .span-bar.span-end { border-radius: 0 4px 4px 0; }
-    .span-bar.span-mid { border-radius: 0; }
-    .span-bar.span-full { border-radius: 4px; }
-
     .cal-cell {
       min-height: 88px; padding: 5px 6px;
       border-right: 1px solid var(--border-light);
       border-bottom: 1px solid var(--border-light);
       cursor: pointer; transition: background 0.1s;
-      overflow: hidden; min-width: 0;
+      overflow: visible; min-width: 0; position: relative;
     }
     .cal-cell:nth-child(7n) { border-right: none; }
     .cal-cell:hover { background: #EFF6FF; }
@@ -212,7 +196,7 @@
     .cal-day.sun { color: var(--danger); }
     .cal-day.sat { color: #2563EB; }
 
-    .cal-events { display: flex; flex-direction: column; gap: 2px; overflow: hidden; min-width: 0; }
+    .cal-events { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
     .holiday-label {
       font-size: 9px; color: var(--danger); font-weight: 600;
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
@@ -224,6 +208,17 @@
       border-left: 3px solid; white-space: nowrap; overflow: hidden;
       text-overflow: ellipsis; cursor: pointer;
     }
+    .event-chip.multi-bar {
+      position: relative; z-index: 3;
+      border-left: none; border-radius: 4px;
+      color: #fff; font-weight: 700;
+      overflow: visible;
+    }
+    .event-chip.multi-bar.cont-start { border-radius: 4px 0 0 4px; }
+    .event-chip.multi-bar.cont-end { border-radius: 0 4px 4px 0; }
+    .event-chip.multi-bar.cont-mid { border-radius: 0; }
+    .event-chip.multi-bar.cont-both { border-radius: 4px; }
+    .event-chip.placeholder { visibility: hidden; height: 20px; }
     .event-chip:hover { transform: scale(1.03); }
     .more-events { font-size: 11px; color: var(--text-muted); font-weight: 600; padding-left: 4px; }
 
@@ -410,8 +405,8 @@
       .cal-cell { min-height: 60px; padding: 3px 2px; }
       .cal-day { width: 22px; height: 22px; font-size: 11px; }
       .event-chip { font-size: 9px; padding: 1px 3px; }
-      .span-bar { height: 16px; font-size: 9px; line-height: 16px; padding: 0 3px; }
-      .cal-week-spans { top: 26px; }
+      .event-chip.multi-bar { font-size: 9px; padding: 1px 3px; height: 16px; }
+      .event-chip.placeholder { height: 16px; }
       .month-nav h2 { font-size: 17px; min-width: 120px; }
     }
 
@@ -1078,79 +1073,50 @@
       const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
       const firstDay = new Date(currentYear, currentMonth, 1).getDay();
       const today = todayStr();
+      const rows = Math.ceil((firstDay + daysInMonth) / 7);
 
-      // Build array of all cells (including leading/trailing empties)
-      const totalCells = firstDay + daysInMonth;
-      const rows = Math.ceil(totalCells / 7);
-      const gridTotal = rows * 7;
+      // Build date map for each cell
+      function cellDate(week, col) {
+        const d = week * 7 + col - firstDay + 1;
+        if (d < 1 || d > daysInMonth) return null;
+        return formatDate(currentYear, currentMonth, d);
+      }
 
-      // Collect all multi-day events active in this month
-      function getMultiDayEvents() {
+      // For each week, get multi-day events and assign lanes
+      function getWeekMultiEvents(week) {
+        const weekDates = [];
+        for (let c = 0; c < 7; c++) weekDates.push(cellDate(week, c));
+        const firstDate = weekDates.find(d => d) || '';
+        const lastDate = weekDates.filter(d => d).pop() || '';
+        if (!firstDate) return [];
+
         const mde = [];
         const seen = new Set();
-        const monthStart = formatDate(currentYear, currentMonth, 1);
-        const monthEnd = formatDate(currentYear, currentMonth, daysInMonth);
-        for (const dateKey in events) {
-          (events[dateKey] || []).forEach(ev => {
+        for (let c = 0; c < 7; c++) {
+          const dt = weekDates[c];
+          if (!dt || !events[dt]) continue;
+          events[dt].forEach(ev => {
             if (seen.has(ev.id)) return;
             if (!filterSet.has(ev.memberId)) return;
             const ds = ev.dateStart || ev.date;
             const de = ev.dateEnd || ev.date;
-            if (ds === de) return; // single-day
-            if (de < monthStart || ds > monthEnd) return;
+            if (ds === de) return;
+            if (de < firstDate || ds > lastDate) return;
             seen.add(ev.id);
-            mde.push(ev);
+            let colStart = 0, colEnd = 6;
+            for (let i = 0; i < 7; i++) {
+              if (weekDates[i] && weekDates[i] >= ds) { colStart = i; break; }
+            }
+            for (let i = 6; i >= 0; i--) {
+              if (weekDates[i] && weekDates[i] <= de) { colEnd = i; break; }
+            }
+            mde.push({ ev, colStart, colEnd, isStart: weekDates.includes(ds), isEnd: weekDates.includes(de) });
           });
         }
-        return mde;
-      }
-
-      const multiDayEvents = getMultiDayEvents();
-
-      // For each week, assign multi-day events to lanes
-      function getWeekSpans(weekStartCell) {
-        const spans = [];
-        const weekDates = [];
-        for (let i = 0; i < 7; i++) {
-          const cellIdx = weekStartCell + i;
-          const d = cellIdx - firstDay + 1;
-          if (d >= 1 && d <= daysInMonth) {
-            weekDates.push(formatDate(currentYear, currentMonth, d));
-          } else {
-            weekDates.push(null);
-          }
-        }
-        const firstDate = weekDates.find(d => d) || '';
-        const lastDate = weekDates.filter(d => d).pop() || '';
-
-        multiDayEvents.forEach(ev => {
-          const ds = ev.dateStart || ev.date;
-          const de = ev.dateEnd || ev.date;
-          if (de < firstDate || ds > lastDate) return;
-
-          let colStart = 0, colEnd = 6;
-          for (let i = 0; i < 7; i++) {
-            if (weekDates[i] && weekDates[i] >= ds) { colStart = i; break; }
-          }
-          for (let i = 6; i >= 0; i--) {
-            if (weekDates[i] && weekDates[i] <= de) { colEnd = i; break; }
-          }
-
-          const isStart = weekDates.includes(ds);
-          const isEnd = weekDates.includes(de);
-
-          spans.push({
-            ev, colStart, colEnd, isStart, isEnd,
-            label: ev.customer || ev.title || '予定'
-          });
-        });
-        return spans;
-      }
-
-      function assignLanes(spans) {
+        // Assign lanes
+        mde.sort((a, b) => a.colStart - b.colStart || (b.colEnd - b.colStart) - (a.colEnd - a.colStart));
         const lanes = [];
-        spans.sort((a, b) => a.colStart - b.colStart || (b.colEnd - b.colStart) - (a.colEnd - a.colStart));
-        spans.forEach(s => {
+        mde.forEach(s => {
           let lane = 0;
           while (true) {
             if (!lanes[lane]) lanes[lane] = [];
@@ -1159,76 +1125,69 @@
             lane++;
           }
         });
-        return lanes.length;
+        return { items: mde, laneCount: lanes.length };
       }
 
-      // Render
       let html = '';
       for (let week = 0; week < rows; week++) {
-        const weekStart = week * 7;
-        const spans = getWeekSpans(weekStart);
-        const laneCount = assignLanes(spans);
-        const spanAreaHeight = laneCount * 22;
+        const weekMulti = getWeekMultiEvents(week);
+        const multiItems = weekMulti.items || [];
+        const laneCount = weekMulti.laneCount || 0;
 
-        // Render spanning bars
-        let spansHtml = '';
-        if (spans.length > 0) {
-          spansHtml = `<div class="cal-week-spans" style="top:${32}px;height:${spanAreaHeight}px">`;
-          spans.forEach(s => {
-            const c = getMemberColor(s.ev.memberId);
-            const left = `calc(${s.colStart} / 7 * 100%)`;
-            const width = `calc(${s.colEnd - s.colStart + 1} / 7 * 100%)`;
-            const top = s.lane * 22;
-            let cls = 'span-full';
-            if (!s.isStart && !s.isEnd) cls = 'span-mid';
-            else if (!s.isStart) cls = 'span-end';
-            else if (!s.isEnd) cls = 'span-start';
-            const showLabel = s.isStart || s.colStart === 0;
-            spansHtml += `<div class="span-bar ${cls}" style="left:${left};width:${width};top:${top}px;background:${c.dot};color:#fff" onclick="event.stopPropagation();onDayClick('${s.ev.dateStart || s.ev.date}')" title="${s.label}">${showLabel ? s.label : ''}</div>`;
-          });
-          spansHtml += '</div>';
-        }
-
-        html += `<div class="cal-week">${spansHtml}`;
-
+        html += '<div class="cal-week">';
         for (let col = 0; col < 7; col++) {
-          const cellIdx = weekStart + col;
-          const d = cellIdx - firstDay + 1;
-
+          const d = week * 7 + col - firstDay + 1;
           if (d < 1 || d > daysInMonth) {
             html += '<div class="cal-cell empty"></div>';
             continue;
           }
 
           const dateStr = formatDate(currentYear, currentMonth, d);
-          const dow = col;
           const isToday = dateStr === today;
           const holiday = getHolidayName(dateStr);
-          const dayClass = (dow === 0 || holiday) ? 'sun' : dow === 6 ? 'sat' : '';
+          const dayClass = (col === 0 || holiday) ? 'sun' : col === 6 ? 'sat' : '';
 
-          // Single-day events only
-          const dayEvents = getFilteredEvents(dateStr).filter(ev => {
-            const ds = ev.dateStart || ev.date;
-            const de = ev.dateEnd || ev.date;
-            return ds === de;
-          });
-
-          const cellPadTop = spanAreaHeight > 0 ? spanAreaHeight + 2 : 0;
-
-          html += `<div class="cal-cell ${isToday ? 'today' : ''} ${holiday ? 'holiday' : ''}" onclick="onDayClick('${dateStr}')" style="${cellPadTop ? 'padding-top:' + (cellPadTop + 5) + 'px' : ''}">`;
+          html += `<div class="cal-cell ${isToday ? 'today' : ''} ${holiday ? 'holiday' : ''}" onclick="onDayClick('${dateStr}')">`;
           html += `<div class="cal-day ${dayClass} ${isToday ? 'today' : ''}">${d}</div>`;
           if (holiday) {
             html += `<div class="holiday-label">${holiday}</div>`;
           }
           html += '<div class="cal-events">';
-          dayEvents.slice(0, 3 - Math.min(laneCount, 2)).forEach(ev => {
+
+          // Render multi-day bar slots for this column
+          for (let lane = 0; lane < laneCount; lane++) {
+            const item = multiItems.find(m => m.lane === lane && m.colStart === col);
+            const occupied = multiItems.find(m => m.lane === lane && col > m.colStart && col <= m.colEnd);
+            if (item) {
+              const span = item.colEnd - item.colStart + 1;
+              const c = getMemberColor(item.ev.memberId);
+              const label = item.ev.customer || item.ev.title || '予定';
+              let cls = 'cont-both';
+              if (!item.isStart && !item.isEnd) cls = 'cont-mid';
+              else if (!item.isStart) cls = 'cont-end';
+              else if (!item.isEnd) cls = 'cont-start';
+              const w = `calc(${span} * 100% + ${(span - 1) * 1}px + ${(span - 1) * 12}px)`;
+              html += `<div class="event-chip multi-bar ${cls}" style="width:${w};background:${c.dot};color:#fff" onclick="event.stopPropagation();onDayClick('${item.ev.dateStart || item.ev.date}')" title="${label}">${item.isStart || col === 0 ? label : ''}</div>`;
+            } else if (occupied) {
+              html += '<div class="event-chip placeholder">.</div>';
+            }
+          }
+
+          // Single-day events
+          const singleEvents = getFilteredEvents(dateStr).filter(ev => {
+            const ds = ev.dateStart || ev.date;
+            const de = ev.dateEnd || ev.date;
+            return ds === de;
+          });
+          const maxSingle = Math.max(0, 3 - laneCount);
+          singleEvents.slice(0, maxSingle).forEach(ev => {
             const c = getMemberColor(ev.memberId);
             const label = ev.customer || ev.title || '予定';
             html += `<div class="event-chip" style="background:${c.bg};color:${c.text};border-left-color:${c.border}">${label}</div>`;
           });
-          const remaining = dayEvents.length - (3 - Math.min(laneCount, 2));
-          if (remaining > 0) {
-            html += `<div class="more-events">+${remaining}件</div>`;
+          const totalForDay = laneCount + singleEvents.length;
+          if (totalForDay > 3) {
+            html += `<div class="more-events">+${totalForDay - 3}件</div>`;
           }
           html += '</div></div>';
         }
