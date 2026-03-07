@@ -897,7 +897,7 @@
           members = snap.docs.map(d => ({ id: d.id, ...d.data() }));
           if (!filterInitialized) {
             if (currentMember) {
-              filterSet = new Set([currentMember.id]);
+              filterSet = buildInitialFilter(currentMember);
               filterInitialized = true;
             } else {
               filterSet = new Set(members.map(m => m.id));
@@ -951,6 +951,22 @@
     function setConnStatus(online) { /* removed */ }
 
     // ── Login ──
+    // ── Login Filter Pairing ──
+    const FILTER_PAIRS = [['川内', '小川']];
+
+    function buildInitialFilter(loggedInMember) {
+      const ids = new Set([loggedInMember.id]);
+      FILTER_PAIRS.forEach(pair => {
+        if (pair.includes(loggedInMember.name)) {
+          pair.forEach(name => {
+            const m = members.find(x => x.name === name);
+            if (m) ids.add(m.id);
+          });
+        }
+      });
+      return ids;
+    }
+
     async function handleLogin() {
       const name = document.getElementById('login-name').value.trim();
       if (!name) return;
@@ -964,7 +980,7 @@
       }
       currentMember = existing;
       viewingMember = existing;
-      filterSet = new Set([existing.id]);
+      filterSet = buildInitialFilter(existing);
       filterInitialized = true;
       localStorage.setItem('schedule-user', name);
       document.getElementById('login-modal').classList.remove('open');
@@ -997,7 +1013,7 @@
             clearInterval(check);
             currentMember = existing;
             viewingMember = existing;
-            filterSet = new Set([existing.id]);
+            filterSet = buildInitialFilter(existing);
             filterInitialized = true;
             document.getElementById('login-modal').classList.remove('open');
             document.getElementById('app').classList.remove('hidden');
