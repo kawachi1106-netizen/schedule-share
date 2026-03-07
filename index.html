@@ -210,13 +210,13 @@
     }
     .event-chip.multi-bar {
       position: relative; z-index: 3;
-      border-left: none; border-radius: 4px;
-      color: #fff; font-weight: 700;
+      border-left: 3px solid;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
       overflow: visible;
     }
     .event-chip.multi-bar.cont-start { border-radius: 4px 0 0 4px; }
-    .event-chip.multi-bar.cont-end { border-radius: 0 4px 4px 0; }
-    .event-chip.multi-bar.cont-mid { border-radius: 0; }
+    .event-chip.multi-bar.cont-end { border-radius: 0 4px 4px 0; border-left: none; }
+    .event-chip.multi-bar.cont-mid { border-radius: 0; border-left: none; }
     .event-chip.multi-bar.cont-both { border-radius: 4px; }
     .event-chip.placeholder { visibility: hidden; height: 20px; }
     .event-chip:hover { transform: scale(1.03); }
@@ -1168,7 +1168,7 @@
               else if (!item.isStart) cls = 'cont-end';
               else if (!item.isEnd) cls = 'cont-start';
               const w = `calc(${span} * 100% + ${(span - 1) * 1}px + ${(span - 1) * 12}px)`;
-              html += `<div class="event-chip multi-bar ${cls}" style="width:${w};background:${c.dot};color:#fff" onclick="event.stopPropagation();onDayClick('${item.ev.dateStart || item.ev.date}')" title="${label}">${item.isStart || col === 0 ? label : ''}</div>`;
+              html += `<div class="event-chip multi-bar ${cls}" style="width:${w};background:${c.bg};color:${c.text};border-left-color:${c.border}" onclick="event.stopPropagation();onDayClick('${item.ev.dateStart || item.ev.date}')" title="${label}">${item.isStart || col === 0 ? label : ''}</div>`;
             } else if (occupied) {
               html += '<div class="event-chip placeholder">.</div>';
             }
