@@ -1,8 +1,9 @@
 {
-  "name": "ScheduleShare",
-  "short_name": "Schedule",
+  "name": "ダイヘンFA西日本",
+  "short_name": "ダイヘンFA",
   "description": "メンバー間スケジュール共有アプリ",
-  "start_url": "/",
+  "start_url": "./",
+  "scope": "./",
   "display": "standalone",
   "background_color": "#F8FAFC",
   "theme_color": "#1E293B",
