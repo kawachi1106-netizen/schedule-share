@@ -1147,7 +1147,13 @@
           });
         }
         // Assign lanes
-        mde.sort((a, b) => a.colStart - b.colStart || (b.colEnd - b.colStart) - (a.colEnd - a.colStart));
+        const myId = currentMember?.id;
+        mde.sort((a, b) => {
+          const aIsMine = a.ev.memberId === myId ? 0 : 1;
+          const bIsMine = b.ev.memberId === myId ? 0 : 1;
+          if (aIsMine !== bIsMine) return aIsMine - bIsMine;
+          return a.colStart - b.colStart || (b.colEnd - b.colStart) - (a.colEnd - a.colStart);
+        });
         const lanes = [];
         mde.forEach(s => {
           let lane = 0;
@@ -1244,9 +1250,13 @@
 
     function getFilteredEvents(dateStr) {
       if (!events[dateStr]) return [];
+      const myId = currentMember?.id;
       return events[dateStr]
         .filter(e => filterSet.has(e.memberId))
         .sort((a, b) => {
+          const aIsMine = a.memberId === myId ? 0 : 1;
+          const bIsMine = b.memberId === myId ? 0 : 1;
+          if (aIsMine !== bIsMine) return aIsMine - bIsMine;
           const ai = getMemberIndex(a.memberId);
           const bi = getMemberIndex(b.memberId);
           if (ai !== bi) return ai - bi;
