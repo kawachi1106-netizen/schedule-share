@@ -1208,7 +1208,8 @@
           }
           html += '<div class="cal-events">';
 
-          // Render multi-day bar slots for this column
+          // Multi-day bar slots for this column
+          let usedSlots = 0;
           for (let lane = 0; lane < laneCount; lane++) {
             const item = multiItems.find(m => m.lane === lane && m.colStart === col);
             const occupied = multiItems.find(m => m.lane === lane && col > m.colStart && col <= m.colEnd);
@@ -1222,8 +1223,10 @@
               else if (!item.isEnd) cls = 'cont-start';
               const w = `calc(${span} * 100% + ${(span - 1) * (1 + cellGap)}px)`;
               html += `<div class="event-chip multi-bar ${cls}" style="width:${w};background:${c.bg};color:${c.text};border-left-color:${c.border}" onclick="event.stopPropagation();onDayClick('${item.ev.dateStart || item.ev.date}')" oncontextmenu="showCtxMenu(event,'${item.ev.dateStart || item.ev.date}','${item.ev.id}')" title="${label}">${item.isStart || col === 0 ? label : ''}</div>`;
+              usedSlots++;
             } else if (occupied) {
               html += '<div class="event-chip placeholder">.</div>';
+              usedSlots++;
             }
           }
 
@@ -1233,15 +1236,16 @@
             const de = ev.dateEnd || ev.date;
             return ds === de;
           });
-          const maxSingle = Math.max(0, 3 - laneCount);
-          singleEvents.slice(0, maxSingle).forEach(ev => {
+          const maxVisible = 6;
+          const singleSlots = Math.max(0, maxVisible - usedSlots);
+          singleEvents.slice(0, singleSlots).forEach(ev => {
             const c = getMemberColor(ev.memberId);
             const label = ev.customer || ev.title || '予定';
             html += `<div class="event-chip" style="background:${c.bg};color:${c.text};border-left-color:${c.border}" oncontextmenu="showCtxMenu(event,'${dateStr}','${ev.id}')">${label}</div>`;
           });
-          const totalForDay = laneCount + singleEvents.length;
-          if (totalForDay > 3) {
-            html += `<div class="more-events">+${totalForDay - 3}件</div>`;
+          const totalEvents = usedSlots + singleEvents.length;
+          if (totalEvents > maxVisible) {
+            html += `<div class="more-events">+${totalEvents - maxVisible}件</div>`;
           }
           html += '</div></div>';
         }
