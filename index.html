@@ -236,6 +236,15 @@
     /* ── Admin Tabs ── */
     .admin-tab { opacity: 0.5; }
     .admin-tab.active { opacity: 1; background: var(--accent); color: #fff; border-color: var(--accent); }
+    .backup-item {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 6px 10px; border-radius: var(--radius);
+      border: 1px solid var(--border-light); margin-bottom: 4px;
+      font-size: 12px;
+    }
+    .backup-item .backup-date { color: var(--text-secondary); font-weight: 600; }
+    .backup-item .backup-info { color: var(--text-muted); font-size: 11px; }
+    .backup-item .backup-actions { display: flex; gap: 4px; }
 
     /* ── Context Menu ── */
     .ctx-menu {
@@ -687,13 +696,21 @@
         <!-- Backup Tab -->
         <div id="admin-tab-backup" class="admin-tab-content">
           <div style="margin-bottom:16px">
-            <h4 style="font-size:14px;margin:0 0 6px">エクスポート（バックアップ保存）</h4>
+            <h4 style="font-size:14px;margin:0 0 6px">📥 手動バックアップ</h4>
             <p style="font-size:12px;color:var(--text-muted);margin:0 0 8px">全メンバー・全予定をJSONファイルとしてダウンロードします。</p>
             <button class="btn btn-primary btn-full" onclick="exportBackup()">📥 バックアップをダウンロード</button>
           </div>
           <hr style="border:none;border-top:1px solid var(--border);margin:16px 0">
+          <div style="margin-bottom:16px">
+            <h4 style="font-size:14px;margin:0 0 6px">🔄 自動バックアップ</h4>
+            <p style="font-size:12px;color:var(--text-muted);margin:0 0 8px">1時間ごとに自動でFirestoreにバックアップされます。最新24件を保持します。</p>
+            <div id="auto-backup-status" style="font-size:12px;color:var(--text-muted);margin-bottom:8px"></div>
+            <div id="auto-backup-list" style="max-height:200px;overflow-y:auto"></div>
+            <button class="btn btn-secondary btn-full" style="margin-top:8px" onclick="loadAutoBackups()">🔄 一覧を更新</button>
+          </div>
+          <hr style="border:none;border-top:1px solid var(--border);margin:16px 0">
           <div>
-            <h4 style="font-size:14px;margin:0 0 6px">インポート（復元）</h4>
+            <h4 style="font-size:14px;margin:0 0 6px">📤 ファイルから復元</h4>
             <p style="font-size:12px;color:var(--text-muted);margin:0 0 8px">バックアップファイルから予定を復元します。既存データに追加されます。</p>
             <input type="file" id="backup-file" accept=".json" style="display:none" onchange="handleBackupFile(event)">
             <button class="btn btn-secondary btn-full" onclick="document.getElementById('backup-file').click()">📤 バックアップファイルを選択</button>
@@ -1758,6 +1775,7 @@
       }
       if (tab === 'backup') {
         document.getElementById('backup-import-status').innerHTML = '';
+        loadAutoBackups();
       }
     }
 
@@ -1929,6 +1947,165 @@
       reader.readAsText(file);
       event.target.value = '';
     }
+
+    // ── Auto Backup ──
+    const AUTO_BACKUP_INTERVAL = 60 * 60 * 1000; // 1 hour
+    const MAX_AUTO_BACKUPS = 24;
+
+    async function runAutoBackup() {
+      try {
+        const membersSnap = await db.collection('members').orderBy('createdAt').get();
+        const eventsSnap = await db.collection('events').get();
+        const backup = {
+          members: membersSnap.docs.map(d => ({ id: d.id, ...d.data() })),
+          events: eventsSnap.docs.map(d => {
+            const data = d.data();
+            if (data.createdAt?.toDate) data.createdAt = data.createdAt.toDate().toISOString();
+            if (data.updatedAt?.toDate) data.updatedAt = data.updatedAt.toDate().toISOString();
+            return { id: d.id, ...data };
+          }),
+        };
+
+        await db.collection('autoBackups').add({
+          timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+          memberCount: backup.members.length,
+          eventCount: backup.events.length,
+          data: JSON.stringify(backup),
+          user: currentMember?.name || 'システム',
+        });
+
+        // Prune old backups
+        const allSnap = await db.collection('autoBackups').orderBy('timestamp', 'desc').get();
+        if (allSnap.docs.length > MAX_AUTO_BACKUPS) {
+          const toDelete = allSnap.docs.slice(MAX_AUTO_BACKUPS);
+          const batch = db.batch();
+          toDelete.forEach(d => batch.delete(d.ref));
+          await batch.commit();
+        }
+
+        console.log('Auto backup completed');
+        updateAutoBackupStatus();
+      } catch (err) {
+        console.error('Auto backup failed:', err);
+      }
+    }
+
+    function updateAutoBackupStatus() {
+      const el = document.getElementById('auto-backup-status');
+      if (!el) return;
+      const now = new Date();
+      el.textContent = `最終: ${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')} / 次回: 1時間後`;
+    }
+
+    async function loadAutoBackups() {
+      const container = document.getElementById('auto-backup-list');
+      container.innerHTML = '<p class="empty-msg">読み込み中...</p>';
+      try {
+        const snap = await db.collection('autoBackups').orderBy('timestamp', 'desc').limit(MAX_AUTO_BACKUPS).get();
+        if (snap.docs.length === 0) {
+          container.innerHTML = '<p class="empty-msg">自動バックアップはまだありません</p>';
+          return;
+        }
+        container.innerHTML = snap.docs.map(d => {
+          const data = d.data();
+          const ts = data.timestamp?.toDate();
+          const timeStr = ts ? `${ts.getFullYear()}/${(ts.getMonth()+1).toString().padStart(2,'0')}/${ts.getDate().toString().padStart(2,'0')} ${ts.getHours().toString().padStart(2,'0')}:${ts.getMinutes().toString().padStart(2,'0')}` : '不明';
+          return `
+            <div class="backup-item">
+              <div>
+                <div class="backup-date">${timeStr}</div>
+                <div class="backup-info">メンバー${data.memberCount}名 / 予定${data.eventCount}件 / ${data.user}</div>
+              </div>
+              <div class="backup-actions">
+                <button class="btn btn-secondary" style="padding:3px 8px;font-size:10px" onclick="downloadAutoBackup('${d.id}')">📥</button>
+                <button class="btn btn-secondary" style="padding:3px 8px;font-size:10px" onclick="restoreAutoBackup('${d.id}')">復元</button>
+              </div>
+            </div>
+          `;
+        }).join('');
+      } catch (err) {
+        container.innerHTML = '<p class="empty-msg">読み込みに失敗しました</p>';
+      }
+    }
+
+    async function downloadAutoBackup(id) {
+      try {
+        const doc = await db.collection('autoBackups').doc(id).get();
+        const data = doc.data();
+        const backup = JSON.parse(data.data);
+        backup.version = 1;
+        backup.exportedAt = data.timestamp?.toDate()?.toISOString() || new Date().toISOString();
+
+        const json = JSON.stringify(backup, null, 2);
+        const blob = new Blob([json], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        const ts = data.timestamp?.toDate();
+        const dateStr = ts ? `${ts.getFullYear()}${(ts.getMonth()+1).toString().padStart(2,'0')}${ts.getDate().toString().padStart(2,'0')}_${ts.getHours().toString().padStart(2,'0')}${ts.getMinutes().toString().padStart(2,'0')}` : 'unknown';
+        a.href = url;
+        a.download = `auto-backup-${dateStr}.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+      } catch (err) {
+        alert('ダウンロードに失敗しました: ' + err.message);
+      }
+    }
+
+    async function restoreAutoBackup(id) {
+      if (!confirm('このバックアップから復元しますか？\n既存データに追加されます。')) return;
+      try {
+        const doc = await db.collection('autoBackups').doc(id).get();
+        const backupData = doc.data();
+        const backup = JSON.parse(backupData.data);
+
+        const existingSnap = await db.collection('members').get();
+        const existingByName = {};
+        existingSnap.docs.forEach(d => { existingByName[d.data().name] = d.id; });
+
+        const memberMap = {};
+        for (const m of backup.members) {
+          if (existingByName[m.name]) {
+            memberMap[m.id] = existingByName[m.name];
+          } else {
+            const ref = await db.collection('members').add({
+              name: m.name, colorIndex: m.colorIndex,
+              createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+            });
+            memberMap[m.id] = ref.id;
+          }
+        }
+
+        let imported = 0;
+        const BATCH_SIZE = 400;
+        for (let i = 0; i < backup.events.length; i += BATCH_SIZE) {
+          const batch = db.batch();
+          backup.events.slice(i, i + BATCH_SIZE).forEach(ev => {
+            const newMemberId = memberMap[ev.memberId];
+            if (!newMemberId) return;
+            const ref = db.collection('events').doc();
+            batch.set(ref, {
+              date: ev.date, dateStart: ev.dateStart || ev.date, dateEnd: ev.dateEnd || ev.date,
+              memberId: newMemberId, title: ev.title || '', customer: ev.customer || '',
+              allDay: ev.allDay !== false, startTime: ev.startTime || '', endTime: ev.endTime || '',
+              memo: ev.memo || '',
+              createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+              updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+            });
+            imported++;
+          });
+          await batch.commit();
+        }
+        await writeLog('member', `自動バックアップから復元（${imported}件）`);
+        alert(`復元完了！ ${imported}件の予定を追加しました`);
+      } catch (err) {
+        alert('復元に失敗しました: ' + err.message);
+      }
+    }
+
+    // Start auto backup timer
+    setInterval(runAutoBackup, AUTO_BACKUP_INTERVAL);
+    // Run first backup 30 seconds after load
+    setTimeout(runAutoBackup, 30000);
 
     // ── Context Menu ──
     let ctxDateStr = '';
