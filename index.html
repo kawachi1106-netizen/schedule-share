@@ -616,11 +616,14 @@
         </div>
         <div class="form-group">
           <label class="form-label">内容</label>
-          <select class="form-input" id="ev-title">
+          <select class="form-input" id="ev-title" style="color:var(--text-primary)">
+            <option value="" disabled selected style="color:var(--text-muted)">例：点検</option>
             <option value="据付">据付</option>
             <option value="点検">点検</option>
             <option value="修理">修理</option>
             <option value="デモ">デモ</option>
+            <option value="展示会">展示会</option>
+            <option value="展示会準備">展示会準備</option>
             <option value="来社実験">来社実験</option>
             <option value="予定あり">予定あり</option>
             <option value="休み">休み</option>
@@ -950,8 +953,13 @@
     // ── Login ──
     // ── Login Filter Pairing ──
     const FILTER_PAIRS = [['川内', '小川']];
+    const SHOW_ALL_MEMBERS = ['川内', '小林', '景山'];
 
     function buildInitialFilter(loggedInMember) {
+      // Show all members for specified users
+      if (SHOW_ALL_MEMBERS.includes(loggedInMember.name)) {
+        return new Set(members.map(m => m.id));
+      }
       const ids = new Set([loggedInMember.id]);
       FILTER_PAIRS.forEach(pair => {
         if (pair.includes(loggedInMember.name)) {
@@ -1455,12 +1463,12 @@
         document.getElementById('ev-date-end').value = dateStr;
         document.getElementById('ev-date-end-group').style.display = 'block';
         document.getElementById('event-modal-title').textContent = '予定を追加';
-        document.getElementById('ev-title').value = '';
+        document.getElementById('ev-title').selectedIndex = 0;
         document.getElementById('ev-customer').value = '';
         document.getElementById('ev-start').value = '09:00';
         document.getElementById('ev-end').value = '10:00';
-        document.getElementById('ev-allday').checked = false;
-        document.getElementById('ev-time-row').style.display = 'flex';
+        document.getElementById('ev-allday').checked = true;
+        document.getElementById('ev-time-row').style.display = 'none';
         document.getElementById('ev-memo').value = '';
         document.querySelector('#event-modal .form-actions .btn-primary').textContent = '追加する';
       }
@@ -1550,7 +1558,8 @@
       const dateStart = document.getElementById('ev-date').value;
       const dateEnd = document.getElementById('ev-date-end').value || dateStart;
       if (!title || !dateStart || memberIds.length === 0) {
-        if (memberIds.length === 0) alert('対象メンバーを1人以上選択してください');
+        if (!title) alert('内容を入力してください');
+        else if (memberIds.length === 0) alert('対象メンバーを1人以上選択してください');
         return;
       }
 
@@ -2151,40 +2160,6 @@
     document.addEventListener('contextmenu', function(e) {
       if (!e.target.closest('.event-chip')) hideCtxMenu();
     });
-
-    // Long-press for mobile
-    let longPressTimer = null;
-    let longPressTriggered = false;
-    document.addEventListener('touchstart', function(e) {
-      const chip = e.target.closest('.event-chip[oncontextmenu]');
-      if (!chip) return;
-      longPressTriggered = false;
-      longPressTimer = setTimeout(() => {
-        longPressTriggered = true;
-        // Clear any text selection
-        window.getSelection().removeAllRanges();
-        const touch = e.touches[0];
-        const ctxAttr = chip.getAttribute('oncontextmenu');
-        const match = ctxAttr.match(/showCtxMenu\(event,'([^']+)','([^']+)'\)/);
-        if (match) {
-          ctxDateStr = match[1];
-          ctxEventId = match[2];
-          const menu = document.getElementById('ctx-menu');
-          menu.classList.add('open');
-          menu.style.left = touch.clientX + 'px';
-          menu.style.top = touch.clientY + 'px';
-        }
-      }, 500);
-    }, { passive: true });
-    document.addEventListener('touchend', function(e) {
-      clearTimeout(longPressTimer);
-      if (longPressTriggered) {
-        e.preventDefault();
-        window.getSelection().removeAllRanges();
-        longPressTriggered = false;
-      }
-    });
-    document.addEventListener('touchmove', () => { clearTimeout(longPressTimer); });
 
     // ── Touch Swipe ──
     let touchStartX = 0;
