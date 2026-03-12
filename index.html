@@ -197,7 +197,11 @@
     .cal-day {
       display: inline-flex; align-items: center; justify-content: center;
       width: 26px; height: 26px; border-radius: 50%; font-size: 13px;
-      font-weight: 700; margin-bottom: 1px;
+      font-weight: 700; flex-shrink: 0;
+    }
+    .cal-day-row {
+      display: flex; align-items: center; gap: 2px;
+      height: 26px; overflow: hidden;
     }
     .cal-day.today { background: var(--text-primary); color: #fff; }
     .cal-day.sun { color: var(--danger); }
@@ -431,6 +435,7 @@
       }
       .cal-cell { min-height: 60px; padding: 2px 1px; overflow: visible; }
       .cal-day { width: 20px; height: 20px; font-size: 10px; }
+      .cal-day-row { height: 20px; }
       .event-chip { font-size: 8px; padding: 1px 2px; }
       .event-chip.multi-bar { font-size: 8px; padding: 1px 2px; height: 14px; }
       .event-chip.placeholder { height: 14px; }
@@ -1216,11 +1221,10 @@
           const dayClass = (col === 0 || holiday) ? 'sun' : col === 6 ? 'sat' : '';
 
           html += `<div class="cal-cell ${isToday ? 'today' : ''} ${holiday ? 'holiday' : ''}" onclick="onDayClick('${dateStr}')">`;
-          html += `<div style="display:flex;align-items:center;gap:2px;min-height:26px"><div class="cal-day ${dayClass} ${isToday ? 'today' : ''}">${d}</div>${holiday ? `<span class="holiday-label">${holiday}</span>` : ''}</div>`;
+          html += `<div class="cal-day-row"><div class="cal-day ${dayClass} ${isToday ? 'today' : ''}">${d}</div>${holiday ? `<span class="holiday-label">${holiday}</span>` : ''}</div>`;
           html += '<div class="cal-events">';
 
           // Multi-day bar slots for this column
-          let usedSlots = 0;
           for (let lane = 0; lane < laneCount; lane++) {
             const item = multiItems.find(m => m.lane === lane && m.colStart === col);
             const occupied = multiItems.find(m => m.lane === lane && col > m.colStart && col <= m.colEnd);
@@ -1234,10 +1238,10 @@
               else if (!item.isEnd) cls = 'cont-start';
               const w = `calc(${span} * 100% + ${(span - 1) * (1 + cellGap)}px)`;
               html += `<div class="event-chip multi-bar ${cls}" style="width:${w};background:${c.bg};color:${c.text};border-left-color:${c.border}" onclick="event.stopPropagation();onDayClick('${item.ev.dateStart || item.ev.date}')" oncontextmenu="showCtxMenu(event,'${item.ev.dateStart || item.ev.date}','${item.ev.id}')" title="${label}">${item.isStart || col === 0 ? label : ''}</div>`;
-              usedSlots++;
             } else if (occupied) {
               html += '<div class="event-chip placeholder">.</div>';
-              usedSlots++;
+            } else {
+              html += '<div class="event-chip placeholder">.</div>';
             }
           }
 
