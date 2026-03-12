@@ -309,6 +309,8 @@
     .form-input:focus, .form-textarea:focus { border-color: var(--accent); }
     .form-input[type="date"] { font-family: inherit; }
     select.form-input { font-family: inherit; appearance: auto; cursor: pointer; }
+    select.form-input.placeholder { color: var(--text-muted); }
+    select.form-input option { color: var(--text-primary); }
     .member-checkbox-list {
       display: flex; flex-wrap: wrap; gap: 6px;
       padding: 8px; border: 1.5px solid var(--border); border-radius: var(--radius);
@@ -616,8 +618,8 @@
         </div>
         <div class="form-group">
           <label class="form-label">内容</label>
-          <select class="form-input" id="ev-title" style="color:var(--text-primary)">
-            <option value="" disabled selected style="color:var(--text-muted)">例：点検</option>
+          <select class="form-input placeholder" id="ev-title" onchange="this.classList.toggle('placeholder', !this.value)">
+            <option value="" disabled selected>例: 点検</option>
             <option value="据付">据付</option>
             <option value="点検">点検</option>
             <option value="修理">修理</option>
@@ -1464,6 +1466,7 @@
         document.getElementById('ev-date-end-group').style.display = 'block';
         document.getElementById('event-modal-title').textContent = '予定を追加';
         document.getElementById('ev-title').selectedIndex = 0;
+        document.getElementById('ev-title').classList.add('placeholder');
         document.getElementById('ev-customer').value = '';
         document.getElementById('ev-start').value = '09:00';
         document.getElementById('ev-end').value = '10:00';
@@ -1498,6 +1501,7 @@
       selectedDate = ev.dateStart || ev.date || dateStr;
       document.getElementById('event-modal-title').textContent = '予定を編集';
       document.getElementById('ev-title').value = ev.title;
+        document.getElementById('ev-title').classList.remove('placeholder');
       document.getElementById('ev-customer').value = ev.customer || '';
       document.getElementById('ev-start').value = ev.startTime || '09:00';
       document.getElementById('ev-end').value = ev.endTime || '10:00';
@@ -1522,6 +1526,7 @@
       copyMode = true;
       document.getElementById('event-modal-title').textContent = '予定をコピー';
       document.getElementById('ev-title').value = ev.title;
+        document.getElementById('ev-title').classList.remove('placeholder');
       document.getElementById('ev-customer').value = ev.customer || '';
       document.getElementById('ev-start').value = ev.startTime || '09:00';
       document.getElementById('ev-end').value = ev.endTime || '10:00';
