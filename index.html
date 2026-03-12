@@ -1212,14 +1212,11 @@
 
           const dateStr = formatDate(currentYear, currentMonth, d);
           const isToday = dateStr === today;
-          const holiday = null; // getHolidayName(dateStr); // 祝日表示を一時的に無効化
+          const holiday = getHolidayName(dateStr);
           const dayClass = (col === 0 || holiday) ? 'sun' : col === 6 ? 'sat' : '';
 
-          html += `<div class="cal-cell ${isToday ? 'today' : ''} ${holiday ? 'holiday' : ''}" onclick="onDayClick('${dateStr}')">`;
+          html += `<div class="cal-cell ${isToday ? 'today' : ''}" onclick="onDayClick('${dateStr}')">`;
           html += `<div class="cal-day ${dayClass} ${isToday ? 'today' : ''}">${d}</div>`;
-          if (holiday) {
-            html += `<div class="holiday-label">${holiday}</div>`;
-          }
           html += '<div class="cal-events">';
 
           // Multi-day bar slots for this column
