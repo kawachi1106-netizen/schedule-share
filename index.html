@@ -205,9 +205,9 @@
 
     .cal-events { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; overflow: visible; }
     .holiday-label {
-      font-size: 9px; color: var(--danger); font-weight: 600;
+      font-size: 8px; color: var(--danger); font-weight: 600;
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-      margin-bottom: 1px;
+      display: inline; margin-left: 2px; vertical-align: middle;
     }
     .cal-cell.holiday { background: #FFF5F5; }
     .event-chip {
@@ -1216,10 +1216,7 @@
           const dayClass = (col === 0 || holiday) ? 'sun' : col === 6 ? 'sat' : '';
 
           html += `<div class="cal-cell ${isToday ? 'today' : ''} ${holiday ? 'holiday' : ''}" onclick="onDayClick('${dateStr}')">`;
-          html += `<div class="cal-day ${dayClass} ${isToday ? 'today' : ''}">${d}</div>`;
-          if (holiday) {
-            html += `<div class="holiday-label">${holiday}</div>`;
-          }
+          html += `<div style="display:flex;align-items:center;gap:2px;min-height:26px"><div class="cal-day ${dayClass} ${isToday ? 'today' : ''}">${d}</div>${holiday ? `<span class="holiday-label">${holiday}</span>` : ''}</div>`;
           html += '<div class="cal-events">';
 
           // Multi-day bar slots for this column
