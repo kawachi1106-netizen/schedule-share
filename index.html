@@ -1247,17 +1247,11 @@
             const de = ev.dateEnd || ev.date;
             return ds === de;
           });
-          const maxVisible = 10;
-          const singleSlots = Math.max(0, maxVisible - usedSlots);
-          singleEvents.slice(0, singleSlots).forEach(ev => {
+          singleEvents.forEach(ev => {
             const c = getMemberColor(ev.memberId);
             const label = ev.customer || ev.title || '予定';
             html += `<div class="event-chip" style="background:${c.bg};color:${c.text};border-left-color:${c.border}" oncontextmenu="showCtxMenu(event,'${dateStr}','${ev.id}')">${label}</div>`;
           });
-          const totalEvents = usedSlots + singleEvents.length;
-          if (totalEvents > maxVisible) {
-            html += `<div class="more-events">+${totalEvents - maxVisible}件</div>`;
-          }
           html += '</div></div>';
         }
         html += '</div>';
