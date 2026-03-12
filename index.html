@@ -1212,7 +1212,7 @@
 
           const dateStr = formatDate(currentYear, currentMonth, d);
           const isToday = dateStr === today;
-          const holiday = getHolidayName(dateStr);
+          const holiday = null; // getHolidayName(dateStr); // 祝日表示を一時的に無効化
           const dayClass = (col === 0 || holiday) ? 'sun' : col === 6 ? 'sat' : '';
 
           html += `<div class="cal-cell ${isToday ? 'today' : ''} ${holiday ? 'holiday' : ''}" onclick="onDayClick('${dateStr}')">`;
