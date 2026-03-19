@@ -1,0 +1,17 @@
+{
+  "name": "川内電機予定表",
+  "short_name": "川内電機",
+  "description": "川内電機スケジュール共有アプリ",
+  "start_url": "/schedule-share/kawachi/",
+  "scope": "/schedule-share/kawachi/",
+  "display": "browser",
+  "background_color": "#F8FAFC",
+  "theme_color": "#1E293B",
+  "icons": [
+    {
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%231E293B'/><text x='50' y='68' text-anchor='middle' font-size='50' fill='%234285F4'>K</text></svg>",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}
