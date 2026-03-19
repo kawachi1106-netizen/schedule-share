@@ -1,0 +1,2268 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="no">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'><rect width='180' height='180' rx='36' fill='%231E293B'/><text x='90' y='120' text-anchor='middle' font-size='90' fill='%234285F4'>D</text></svg>">
+  <title>川内電機 - 予定表</title>
+  <link rel="manifest" href="../manifest.json">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --cell-gap: 11px;
+      --bg: #F8FAFC;
+      --surface: #FFFFFF;
+      --border: #E2E8F0;
+      --border-light: #F1F5F9;
+      --text-primary: #1E293B;
+      --text-secondary: #475569;
+      --text-muted: #94A3B8;
+      --text-dim: #64748B;
+      --accent: #4285F4;
+      --danger: #DC2626;
+      --danger-bg: #FEE2E2;
+      --danger-border: #FECACA;
+      --today-bg: #FFFBEB;
+      --shadow-sm: 0 1px 3px rgba(0,0,0,0.04);
+      --shadow-md: 0 4px 12px rgba(0,0,0,0.08);
+      --shadow-lg: 0 24px 48px rgba(0,0,0,0.18);
+      --radius: 10px;
+      --radius-lg: 14px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Noto Sans JP', sans-serif;
+      background: var(--bg);
+      color: var(--text-primary);
+      height: 100vh; overflow: auto;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ── Header ── */
+    .header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 0 12px;
+      height: 44px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .header-left { display: flex; align-items: center; gap: 10px; }
+    .header h1 { font-size: 16px; font-weight: 800; letter-spacing: -0.02em; }
+    .header h1 span { color: var(--accent); }
+    .header-right { display: flex; align-items: center; gap: 8px; }
+
+    .icon-btn {
+      background: none; border: none; cursor: pointer; padding: 6px;
+      color: var(--text-secondary); display: flex; align-items: center;
+      border-radius: 8px; transition: background 0.15s;
+    }
+    .icon-btn:hover { background: var(--border-light); }
+    .icon-btn.bg { background: var(--border-light); }
+
+    .user-badge {
+      display: flex; align-items: center; gap: 6px;
+      padding: 5px 12px; border-radius: 20px;
+      font-size: 13px; font-weight: 600;
+    }
+    .user-badge .dot { width: 8px; height: 8px; border-radius: 50%; }
+
+    /* ── Layout ── */
+    .layout { display: flex; position: relative; min-height: calc(100vh - 44px); }
+
+    /* ── Sidebar ── */
+    .sidebar {
+      width: 200px; background: var(--surface);
+      border-right: 1px solid var(--border);
+      padding: 12px; flex-shrink: 0; overflow-y: auto;
+      position: sticky; top: 44px; height: calc(100vh - 44px);
+    }
+    .sidebar-header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 8px;
+    }
+    .sidebar-header h3 {
+      font-size: 13px; font-weight: 700; color: var(--text-muted);
+      letter-spacing: 0.06em;
+    }
+    .sidebar-add-btn {
+      background: var(--border-light); border: none; border-radius: 8px;
+      padding: 5px 10px; cursor: pointer; color: var(--text-secondary);
+      font-size: 12px; font-weight: 600; display: flex; align-items: center;
+      gap: 4px; font-family: inherit; transition: background 0.15s;
+    }
+    .sidebar-add-btn:hover { background: var(--border); }
+
+    .member-list { display: flex; flex-direction: column; gap: 4px; }
+    .member-item {
+      display: flex; align-items: center; gap: 6px; padding: 6px 8px;
+      border-radius: var(--radius); cursor: pointer;
+      border: 1.5px solid transparent; transition: all 0.15s;
+    }
+    .member-item:hover { background: var(--border-light); }
+    .member-item.active { border-color: currentColor; }
+
+    .member-check {
+      width: 16px; height: 16px; border-radius: 4px; border: 2px solid;
+      cursor: pointer; flex-shrink: 0; display: flex;
+      align-items: center; justify-content: center; background: transparent;
+      transition: background 0.15s; padding: 0;
+    }
+    .member-check.checked { background: currentColor; }
+    .member-check svg { width: 10px; height: 10px; }
+
+    .member-name { font-size: 13px; font-weight: 500; flex: 1; }
+    .member-item.active .member-name { font-weight: 700; }
+    .editing-badge {
+      font-size: 10px; font-weight: 600; padding: 2px 6px; border-radius: 4px;
+    }
+
+    .sidebar-help {
+      margin-top: 12px; padding: 8px; background: var(--bg);
+      border-radius: var(--radius); font-size: 10px; color: var(--text-muted); line-height: 1.5;
+    }
+    .sidebar-help strong { color: var(--text-dim); }
+
+    .sidebar-overlay { display: none; }
+
+    /* ── Main ── */
+    .main {
+      flex: 1; padding: 8px 12px 4px; width: 100%;
+    }
+    .month-nav {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 8px; gap: 4px;
+    }
+    .month-nav-left { display: flex; align-items: center; gap: 4px; }
+    .month-nav h2 {
+      font-size: 20px; font-weight: 800; min-width: 130px; text-align: center;
+    }
+    .nav-btn {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 6px 8px; cursor: pointer;
+      display: flex; color: var(--text-secondary); transition: background 0.15s;
+    }
+    .nav-btn:hover { background: var(--border-light); }
+    .month-nav-right { display: flex; gap: 4px; flex-shrink: 0; }
+
+    .viewing-indicator {
+      padding: 6px 12px; border-radius: var(--radius); margin-bottom: 6px;
+      font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 8px;
+    }
+
+    /* ── Calendar ── */
+    .calendar {
+      background: var(--surface); border-radius: var(--radius-lg);
+      border: 1px solid var(--border); overflow: hidden; box-shadow: var(--shadow-sm);
+    }
+    .cal-grid {
+      -webkit-user-select: none; user-select: none;
+    }
+    .cal-header {
+      display: grid; grid-template-columns: repeat(7, minmax(0, 1fr));
+      border-bottom: 1px solid var(--border);
+    }
+    .cal-header-cell {
+      padding: 6px 4px; text-align: center; font-size: 12px;
+      font-weight: 700; letter-spacing: 0.05em;
+    }
+    .cal-header-cell.sun { color: var(--danger); }
+    .cal-header-cell.sat { color: #2563EB; }
+    .cal-header-cell.weekday { color: var(--text-muted); }
+
+    .cal-week {
+      display: grid; grid-template-columns: repeat(7, minmax(0, 1fr));
+    }
+    .cal-cell {
+      min-height: 40px; padding: 3px 5px;
+      border-right: 1px solid var(--border-light);
+      border-bottom: 1px solid var(--border-light);
+      cursor: pointer; transition: background 0.1s;
+      overflow: visible; min-width: 0; position: relative;
+      display: flex; flex-direction: column;
+    }
+    .cal-cell:nth-child(7n) { border-right: none; }
+    .cal-cell:hover { background: #EFF6FF; }
+    .cal-cell.empty { background: #FAFBFC; cursor: default; }
+    .cal-cell.empty:hover { background: #FAFBFC; }
+    .cal-cell.today { background: var(--today-bg); }
+
+    .cal-day {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 26px; height: 26px; border-radius: 50%; font-size: 13px;
+      font-weight: 700; margin-bottom: 1px;
+    }
+    .cal-day.today { background: var(--text-primary); color: #fff; }
+    .cal-day.sun { color: var(--danger); }
+    .cal-day.sat { color: #2563EB; }
+
+    .cal-events { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; overflow: visible; }
+    .holiday-label {
+      font-size: 9px; color: var(--danger); font-weight: 600;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      margin-bottom: 1px;
+    }
+    .cal-cell.holiday { background: #FFF5F5; }
+    .event-chip {
+      padding: 3px 6px; border-radius: 4px; font-size: 11px; font-weight: 600;
+      border-left: 3px solid; white-space: nowrap; overflow: hidden;
+      text-overflow: ellipsis; cursor: pointer;
+      -webkit-user-select: none; user-select: none; -webkit-touch-callout: none;
+    }
+    .event-chip.multi-bar {
+      position: relative; z-index: 1;
+      border-left: 3px solid;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      overflow: visible;
+    }
+    .event-chip.multi-bar.cont-start { border-radius: 4px 0 0 4px; }
+    .event-chip.multi-bar.cont-end { border-radius: 0 4px 4px 0; border-left: none; }
+    .event-chip.multi-bar.cont-mid { border-radius: 0; border-left: none; }
+    .event-chip.multi-bar.cont-both { border-radius: 4px; }
+    .event-chip.placeholder { visibility: hidden; height: 20px; }
+    .event-chip:hover { transform: scale(1.03); }
+    .more-events { font-size: 11px; color: var(--text-muted); font-weight: 600; padding-left: 4px; }
+
+    /* ── Admin Tabs ── */
+    .admin-tab { opacity: 0.5; }
+    .admin-tab.active { opacity: 1; background: var(--accent); color: #fff; border-color: var(--accent); }
+    .backup-item {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 6px 10px; border-radius: var(--radius);
+      border: 1px solid var(--border-light); margin-bottom: 4px;
+      font-size: 12px;
+    }
+    .backup-item .backup-date { color: var(--text-secondary); font-weight: 600; }
+    .backup-item .backup-info { color: var(--text-muted); font-size: 11px; }
+    .backup-item .backup-actions { display: flex; gap: 4px; }
+
+    /* ── Context Menu ── */
+    .ctx-menu {
+      position: fixed; z-index: 9999; background: var(--surface);
+      border: 1px solid var(--border); border-radius: var(--radius);
+      box-shadow: var(--shadow-lg); padding: 4px 0; min-width: 120px;
+      display: none;
+    }
+    .ctx-menu.open { display: block; }
+    .ctx-menu-item {
+      padding: 8px 16px; font-size: 13px; font-weight: 600; cursor: pointer;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .ctx-menu-item:hover { background: #EFF6FF; }
+    .ctx-menu-item.danger { color: var(--danger); }
+    .ctx-menu-item.danger:hover { background: var(--danger-bg); }
+
+    /* ── Buttons ── */
+    .btn {
+      padding: 10px 20px; border-radius: var(--radius); font-size: 14px;
+      font-weight: 600; cursor: pointer; font-family: inherit;
+      transition: opacity 0.15s; border: none;
+    }
+    .btn:hover { opacity: 0.85; }
+    .btn-primary { background: var(--text-primary); color: #fff; }
+    .btn-secondary { background: var(--border-light); color: var(--text-secondary); border: 1px solid var(--border); }
+    .btn-danger { background: var(--danger-bg); color: var(--danger); border: 1px solid var(--danger-border); }
+    .btn-sm { padding: 8px 14px; font-size: 13px; }
+    .btn-icon { display: inline-flex; align-items: center; gap: 4px; }
+    .btn-full { width: 100%; }
+
+    /* ── Modal ── */
+    .modal-overlay {
+      position: fixed; inset: 0; z-index: 1000;
+      display: flex; align-items: center; justify-content: center;
+      background: rgba(15,23,42,0.45); backdrop-filter: blur(4px);
+      padding: 16px; opacity: 0; pointer-events: none; transition: opacity 0.2s;
+    }
+    .modal-overlay.open { opacity: 1; pointer-events: all; }
+    .modal {
+      background: var(--surface); border-radius: 16px; width: 100%; max-width: 420px;
+      max-height: 90vh; overflow: auto; box-shadow: var(--shadow-lg);
+      transform: translateY(12px) scale(0.97); transition: transform 0.2s;
+    }
+    .modal-overlay.open .modal { transform: none; }
+    .modal.wide { max-width: 460px; }
+    .modal-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 18px 20px 14px; border-bottom: 1px solid var(--border);
+    }
+    .modal-header h3 { font-size: 17px; font-weight: 700; }
+    .modal-body { padding: 16px 20px 20px; }
+
+    /* ── Form ── */
+    .form-group { margin-bottom: 14px; }
+    .form-label {
+      display: block; font-size: 12px; font-weight: 600; color: var(--text-dim);
+      margin-bottom: 5px; letter-spacing: 0.03em;
+    }
+    .form-input, .form-textarea {
+      width: 100%; padding: 10px 12px; border: 1.5px solid var(--border);
+      border-radius: var(--radius); font-size: 14px; outline: none;
+      font-family: inherit; transition: border 0.15s;
+    }
+    .form-input:focus, .form-textarea:focus { border-color: var(--accent); }
+    .form-input[type="date"] { font-family: inherit; }
+    select.form-input { font-family: inherit; appearance: auto; cursor: pointer; }
+    select.form-input.placeholder { color: var(--text-muted); }
+    select.form-input option { color: var(--text-primary); }
+    .member-checkbox-list {
+      display: flex; flex-wrap: wrap; gap: 6px;
+      padding: 8px; border: 1.5px solid var(--border); border-radius: var(--radius);
+      background: var(--bg); min-height: 40px;
+    }
+    .member-checkbox-item {
+      display: flex; align-items: center; gap: 5px;
+      padding: 5px 12px 5px 8px; border-radius: 20px; cursor: pointer;
+      font-size: 13px; font-weight: 600; border: 2px solid;
+      transition: all 0.15s; user-select: none;
+    }
+    .member-checkbox-item input { display: none; }
+    .member-checkbox-item .check-mark {
+      width: 16px; height: 16px; border-radius: 4px; border: 2px solid;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0; transition: background 0.15s;
+    }
+    .member-checkbox-item.checked .check-mark { background: currentColor; }
+    .member-checkbox-item.checked .check-mark svg { display: block; }
+    .member-checkbox-item .check-mark svg { display: none; }
+    .form-textarea { resize: vertical; min-height: 70px; }
+    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .form-actions { display: flex; gap: 8px; margin-top: 4px; }
+    .form-actions .btn { flex: 1; }
+
+    /* ── Login ── */
+    .login-icon {
+      width: 56px; height: 56px; border-radius: 14px; background: var(--text-primary);
+      display: inline-flex; align-items: center; justify-content: center; margin-bottom: 12px;
+    }
+    .login-desc { font-size: 13px; color: var(--text-dim); line-height: 1.6; }
+    .member-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+    .member-tag {
+      padding: 6px 14px; border-radius: 20px; font-size: 13px; font-weight: 500;
+      border: 1.5px solid var(--border); background: var(--surface);
+      color: var(--text-secondary); cursor: pointer; font-family: inherit;
+      transition: all 0.15s;
+    }
+    .member-tag.selected { border-width: 2px; }
+
+    /* ── Day Detail ── */
+    .event-card {
+      padding: 12px 14px; border-radius: 12px; border-left: 4px solid;
+      margin-bottom: 8px;
+    }
+    .event-card-header { display: flex; justify-content: space-between; align-items: flex-start; }
+    .event-card-title { font-size: 15px; font-weight: 700; margin-bottom: 4px; }
+    .event-card-info { font-size: 12px; color: var(--text-dim); margin-bottom: 2px; }
+    .event-card-actions { display: flex; gap: 4px; }
+    .event-action-btn {
+      background: var(--surface); border-radius: 6px; padding: 6px;
+      cursor: pointer; display: flex; transition: opacity 0.15s;
+    }
+    .event-action-btn:hover { opacity: 0.7; }
+    .event-action-btn.delete { background: var(--danger-bg); border: 1px solid var(--danger-border); color: var(--danger); }
+
+    /* ── Bulk Delete ── */
+    .bulk-bar {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 10px; gap: 8px;
+    }
+    .bulk-bar .bulk-info { font-size: 12px; color: var(--text-dim); }
+    .ev-checkbox { width: 18px; height: 18px; accent-color: var(--danger); cursor: pointer; flex-shrink: 0; margin-right: 8px; }
+    .event-card-row { display: flex; align-items: flex-start; }
+    .event-card-row .event-card { flex: 1; }
+
+    /* ── Log Viewer ── */
+    .log-list { max-height: 400px; overflow-y: auto; }
+    .log-item {
+      padding: 10px 12px; border-radius: var(--radius); margin-bottom: 6px;
+      font-size: 13px; border-left: 3px solid;
+    }
+    .log-item.log-add { background: #E6F9EF; border-left-color: #34A853; }
+    .log-item.log-edit { background: #FFF8E1; border-left-color: #F9AB00; }
+    .log-item.log-delete { background: var(--danger-bg); border-left-color: var(--danger); }
+    .log-item.log-member { background: #EFF6FF; border-left-color: #2563EB; }
+    .log-meta { font-size: 11px; color: var(--text-muted); margin-top: 3px; }
+    .log-load-more { text-align: center; margin-top: 8px; }
+
+    /* ── Member Management ── */
+    .member-manage-item {
+      display: flex; align-items: center; gap: 8px;
+      padding: 10px 12px; border-radius: var(--radius); margin-bottom: 6px;
+      flex-wrap: wrap;
+    }
+    .member-manage-left { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; }
+    .member-manage-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+    .member-manage-name { font-size: 14px; font-weight: 600; }
+    .color-swatches { display: flex; gap: 3px; align-items: center; flex-wrap: wrap; max-width: 200px; }
+    .color-swatch {
+      width: 18px; height: 18px; border-radius: 50%; cursor: pointer;
+      border: 2px solid transparent; transition: transform 0.1s;
+      flex-shrink: 0;
+    }
+    .color-swatch:hover { transform: scale(1.2); }
+    .color-swatch.selected { border-color: #1F2937; transform: scale(1.15); }
+    .member-name-edit { transition: none; }
+    .you-badge {
+      font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 4px; color: #fff;
+    }
+
+    .empty-msg { color: var(--text-muted); font-size: 13px; text-align: center; padding: 20px; }
+
+    /* ── Mobile ── */
+    @media (max-width: 768px) {
+      :root { --cell-gap: 3px; }
+      body { height: auto; overflow: auto; }
+      .layout { height: auto; overflow: visible; }
+      .hide-mobile { display: none !important; }
+      .sidebar {
+        position: fixed; left: 0; top: 44px; bottom: 0; z-index: 900;
+        transform: translateX(-100%); transition: transform 0.25s ease;
+      }
+      .sidebar.open { transform: translateX(0); box-shadow: var(--shadow-lg); }
+      .sidebar-overlay.open {
+        display: block; position: fixed; inset: 0; top: 44px;
+        z-index: 899; background: rgba(0,0,0,0.3);
+      }
+      .cal-cell { min-height: 60px; padding: 2px 1px; overflow: visible; }
+      .cal-day { width: 20px; height: 20px; font-size: 10px; }
+      .event-chip { font-size: 8px; padding: 1px 2px; }
+      .event-chip.multi-bar { font-size: 8px; padding: 1px 2px; height: 14px; }
+      .event-chip.placeholder { height: 14px; }
+      .month-nav h2 { font-size: 15px; min-width: 100px; }
+      .month-nav-right .btn { padding: 6px 8px; font-size: 11px; }
+      .nav-btn { padding: 5px 6px; }
+      .nav-btn svg { width: 16px; height: 16px; }
+      .holiday-label { font-size: 7px; }
+    }
+
+    /* ── Loading Spinner ── */
+    .loading-screen {
+      display: flex; flex-direction: column; align-items: center;
+      justify-content: center; height: 100vh; color: var(--text-dim);
+    }
+    .spinner {
+      width: 32px; height: 32px; border: 3px solid var(--border);
+      border-top-color: var(--accent); border-radius: 50%;
+      animation: spin 0.8s linear infinite; margin-bottom: 12px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .hidden { display: none !important; }
+  </style>
+</head>
+<body>
+
+  <!-- Loading Screen -->
+  <div id="loading-screen" class="loading-screen">
+    <div class="spinner"></div>
+    <div>読み込み中...</div>
+  </div>
+
+  <!-- App (hidden until loaded) -->
+  <div id="app" class="hidden">
+
+    <!-- Header -->
+    <header class="header">
+      <div class="header-left">
+        <button class="icon-btn" onclick="toggleSidebar()" aria-label="メニュー">
+          <svg width="22" height="22" viewBox="0 0 22 22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6H19M3 11H19M3 16H19"/></svg>
+        </button>
+        <h1>川内電機<span>予定表</span></h1>
+      </div>
+      <div class="header-right">
+        <div id="user-badge" class="user-badge"></div>
+      </div>
+    </header>
+
+    <div class="layout">
+      <!-- Sidebar Overlay -->
+      <div id="sidebar-overlay" class="sidebar-overlay" onclick="toggleSidebar()"></div>
+
+      <!-- Sidebar -->
+      <aside id="sidebar" class="sidebar">
+        <div class="sidebar-header">
+          <h3>メンバー</h3>
+          <button class="sidebar-add-btn" onclick="openMemberModal()">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9.5 1.5L12.5 4.5M2 10L1.5 12.5L4 12L12 4L10 2L2 10Z"/></svg>
+            メンバー管理
+          </button>
+        </div>
+        <div id="member-list" class="member-list"></div>
+        <div style="display:flex;gap:6px;margin-top:8px;margin-bottom:4px;">
+          <button class="sidebar-add-btn" style="flex:1;justify-content:center" onclick="filterAll()">全表示</button>
+          <button class="sidebar-add-btn" style="flex:1;justify-content:center" onclick="filterNone()">全非表示</button>
+        </div>
+        <div class="sidebar-help">
+          <strong>使い方</strong><br>
+          ✓ 名前タップで表示/非表示を切替<br>
+          ✓ 日付クリックで予定を追加
+        </div>
+        <div style="margin-top:12px">
+          <button class="sidebar-add-btn" style="width:100%;justify-content:center" onclick="openAdminModal();toggleSidebar()">⚙ 管理メニュー</button>
+        </div>
+      </aside>
+
+      <!-- Main -->
+      <main class="main">
+        <div class="month-nav">
+          <div class="month-nav-left">
+            <button class="nav-btn" onclick="prevMonth()">
+              <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12.5 15L7.5 10L12.5 5"/></svg>
+            </button>
+            <h2 id="month-title"></h2>
+            <button class="nav-btn" onclick="nextMonth()">
+              <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M7.5 5L12.5 10L7.5 15"/></svg>
+            </button>
+          </div>
+          <div class="month-nav-right">
+            <button class="btn btn-secondary btn-sm" onclick="goToday()">今日</button>
+            <button id="add-event-btn" class="btn btn-primary btn-sm btn-icon" onclick="openAddEvent()">
+              <svg class="hide-mobile" width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M7 3V11M3 7H11"/></svg>
+              予定追加
+            </button>
+          </div>
+        </div>
+        <div id="viewing-indicator" class="viewing-indicator hidden"></div>
+        <div class="calendar">
+          <div class="cal-header" id="cal-header"></div>
+          <div class="cal-grid" id="cal-grid"></div>
+        </div>
+      </main>
+    </div>
+
+  </div>
+
+  <!-- Context Menu -->
+  <div id="ctx-menu" class="ctx-menu">
+    <div class="ctx-menu-item" onclick="ctxAction('edit')">✏️ 編集</div>
+    <div class="ctx-menu-item" onclick="ctxAction('copy')">📋 コピー</div>
+    <div class="ctx-menu-item danger" onclick="ctxAction('delete')">🗑 削除</div>
+  </div>
+
+  <!-- Login Modal -->
+  <div id="login-modal" class="modal-overlay open">
+    <div class="modal" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <h3>川内電機予定表</h3>
+        <div></div>
+      </div>
+      <div class="modal-body" style="text-align:center;">
+        <div class="login-icon">
+          <svg width="22" height="22" viewBox="0 0 22 22" fill="none" stroke="#fff" stroke-width="1.5" stroke-linecap="round"><circle cx="7" cy="6" r="3"/><path d="M1 18C1 14 4 12 7 12C10 12 13 14 13 18"/><circle cx="16" cy="7" r="2.5"/><path d="M21 18C21 15 19 13 16 13"/></svg>
+        </div>
+        <p class="login-desc">
+          名前を入力してログインしてください。<br>
+          初めての方は自動的にメンバー登録されます。
+        </p>
+        <div style="text-align:left; margin-top: 16px;">
+          <div class="form-group">
+            <label class="form-label">あなたの名前</label>
+            <input class="form-input" id="login-name" placeholder="例: 山田太郎" onkeydown="if(event.key==='Enter')handleLogin()">
+          </div>
+          <div class="form-group" id="login-members-group" style="display:none">
+            <label class="form-label">登録済みメンバー</label>
+            <div class="member-tags" id="login-member-tags"></div>
+          </div>
+          <button class="btn btn-primary btn-full" onclick="handleLogin()">ログイン</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Day Detail Modal -->
+  <div id="day-modal" class="modal-overlay" onclick="closeDayModal()">
+    <div class="modal wide" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <h3 id="day-modal-title"></h3>
+        <button class="icon-btn" onclick="closeDayModal()">
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 4L14 14M14 4L4 14"/></svg>
+        </button>
+      </div>
+      <div class="modal-body" id="day-modal-body"></div>
+    </div>
+  </div>
+
+  <!-- Event Modal -->
+  <div id="event-modal" class="modal-overlay" onclick="closeEventModal()">
+    <div class="modal" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <h3 id="event-modal-title">予定を追加</h3>
+        <button class="icon-btn" onclick="closeEventModal()">
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 4L14 14M14 4L4 14"/></svg>
+        </button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label class="form-label">対象メンバー（複数選択可）</label>
+          <div id="ev-member-list" class="member-checkbox-list"></div>
+        </div>
+        <div class="form-row" id="ev-date-row">
+          <div class="form-group">
+            <label class="form-label">開始日</label>
+            <input class="form-input" type="date" id="ev-date">
+          </div>
+          <div class="form-group" id="ev-date-end-group">
+            <label class="form-label">終了日</label>
+            <input class="form-input" type="date" id="ev-date-end">
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">需要家名</label>
+          <input class="form-input" id="ev-customer" placeholder="例: 日産車体九州">
+        </div>
+        <div class="form-group">
+          <label class="form-label">内容</label>
+          <select class="form-input placeholder" id="ev-title" onchange="this.classList.toggle('placeholder', !this.value)">
+            <option value="" disabled selected>例: 点検</option>
+            <option value="据付">据付</option>
+            <option value="点検">点検</option>
+            <option value="修理">修理</option>
+            <option value="調整">調整</option>
+            <option value="ティーチング">ティーチング</option>
+            <option value="生産立ち合い">生産立ち合い</option>
+            <option value="施工実験">施工実験</option>
+            <option value="デモ">デモ</option>
+            <option value="来社対応">来社対応</option>
+            <option value="展示会">展示会</option>
+            <option value="展示会準備">展示会準備</option>
+            <option value="打合せ">打合せ</option>
+            <option value="WEB会議">WEB会議</option>
+            <option value="電話当番">電話当番</option>
+            <option value="予定あり">予定あり</option>
+            <option value="休み">休み</option>
+            <option value="その他">その他</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label" style="display:flex;align-items:center;gap:8px;cursor:pointer">
+            <input type="checkbox" id="ev-allday" onchange="toggleAllDay()" style="width:16px;height:16px;cursor:pointer">
+            終日
+          </label>
+        </div>
+        <div class="form-row" id="ev-time-row">
+          <div class="form-group">
+            <label class="form-label">開始時刻</label>
+            <input class="form-input" type="time" id="ev-start" value="09:00">
+          </div>
+          <div class="form-group">
+            <label class="form-label">終了時刻</label>
+            <input class="form-input" type="time" id="ev-end" value="10:00">
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">メモ</label>
+          <textarea class="form-textarea" id="ev-memo" placeholder="詳細メモ（任意）"></textarea>
+        </div>
+        <div class="form-actions">
+          <button class="btn btn-secondary" onclick="closeEventModal()">キャンセル</button>
+          <button class="btn btn-primary" onclick="saveEvent()">追加する</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Member Modal -->
+  <div id="member-modal" class="modal-overlay" onclick="closeMemberModal()">
+    <div class="modal" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <h3>メンバー管理</h3>
+        <button class="icon-btn" onclick="closeMemberModal()">
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 4L14 14M14 4L4 14"/></svg>
+        </button>
+      </div>
+      <div class="modal-body">
+        <div style="display:flex;gap:8px;margin-bottom:16px;">
+          <input class="form-input" id="new-member-name" placeholder="新しいメンバー名"
+            style="flex:1;margin-bottom:0" onkeydown="if(event.key==='Enter')addMember()">
+          <button class="btn btn-primary" onclick="addMember()" style="padding:10px 16px">追加</button>
+        </div>
+        <div id="member-manage-list"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Admin Modal -->
+  <div id="admin-modal" class="modal-overlay" onclick="closeAdminModal()">
+    <div class="modal wide" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <h3>⚙ 管理</h3>
+        <button class="icon-btn" onclick="closeAdminModal()">
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 4L14 14M14 4L4 14"/></svg>
+        </button>
+      </div>
+      <div class="modal-body">
+        <!-- Tab buttons -->
+        <div style="display:flex;gap:6px;margin-bottom:16px">
+          <button class="btn btn-secondary btn-sm admin-tab active" data-tab="backup" onclick="switchAdminTab('backup')">💾 バックアップ</button>
+          <button class="btn btn-secondary btn-sm admin-tab" data-tab="log" onclick="switchAdminTab('log')">📋 編集履歴</button>
+        </div>
+
+        <!-- Backup Tab -->
+        <div id="admin-tab-backup" class="admin-tab-content">
+          <div style="margin-bottom:16px">
+            <h4 style="font-size:14px;margin:0 0 6px">📥 手動バックアップ</h4>
+            <p style="font-size:12px;color:var(--text-muted);margin:0 0 8px">全メンバー・全予定をJSONファイルとしてダウンロードします。</p>
+            <button class="btn btn-primary btn-full" onclick="exportBackup()">📥 バックアップをダウンロード</button>
+          </div>
+          <hr style="border:none;border-top:1px solid var(--border);margin:16px 0">
+          <div style="margin-bottom:16px">
+            <h4 style="font-size:14px;margin:0 0 6px">🔄 自動バックアップ</h4>
+            <p style="font-size:12px;color:var(--text-muted);margin:0 0 8px">1時間ごとに自動でFirestoreにバックアップされます。最新24件を保持します。</p>
+            <div id="auto-backup-status" style="font-size:12px;color:var(--text-muted);margin-bottom:8px"></div>
+            <div id="auto-backup-list" style="max-height:200px;overflow-y:auto"></div>
+            <button class="btn btn-secondary btn-full" style="margin-top:8px" onclick="loadAutoBackups()">🔄 一覧を更新</button>
+          </div>
+          <hr style="border:none;border-top:1px solid var(--border);margin:16px 0">
+          <div>
+            <h4 style="font-size:14px;margin:0 0 6px">📤 ファイルから復元</h4>
+            <p style="font-size:12px;color:var(--text-muted);margin:0 0 8px">バックアップファイルから予定を復元します。既存データに追加されます。</p>
+            <input type="file" id="backup-file" accept=".json" style="display:none" onchange="handleBackupFile(event)">
+            <button class="btn btn-secondary btn-full" onclick="document.getElementById('backup-file').click()">📤 バックアップファイルを選択</button>
+            <div id="backup-import-status" style="margin-top:8px;font-size:13px"></div>
+          </div>
+        </div>
+
+        <!-- Log Tab -->
+        <div id="admin-tab-log" class="admin-tab-content" style="display:none">
+          <div class="log-list" id="log-list"></div>
+          <div class="log-load-more" id="log-load-more" style="display:none">
+            <button class="btn btn-secondary btn-sm" onclick="loadMoreLogs()">さらに読み込む</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+
+  <script>
+    // ══════════════════════════════════════════
+    // 🔧 Firebase 設定 — ここを自分のプロジェクトの値に書き換えてください
+    // ══════════════════════════════════════════
+    const firebaseConfig = {
+      apiKey: "AIzaSyBsmReWCHaNnFv1_ZOep9FRFhG_hgKssRA",
+      authDomain: "daihenfa-westjapan.firebaseapp.com",
+      projectId: "daihenfa-westjapan",
+      storageBucket: "daihenfa-westjapan.firebasestorage.app",
+      messagingSenderId: "1026196339850",
+      appId: "1:1026196339850:web:3b12e178ba00a0a2518173"
+    };
+    // ══════════════════════════════════════════
+
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+
+    // ── Constants ──
+    const DAYS_JP = ["日","月","火","水","木","金","土"];
+
+    // ── 日本の祝日 ──
+    function getHolidays(year) {
+      const holidays = {};
+      const add = (m, d, name) => { holidays[formatDate(year, m, d)] = name; };
+
+      // 固定祝日
+      add(0, 1, '元日');
+      add(1, 11, '建国記念の日');
+      add(1, 23, '天皇誕生日');
+      add(3, 29, '昭和の日');
+      add(4, 3, '憲法記念日');
+      add(4, 4, 'みどりの日');
+      add(4, 5, 'こどもの日');
+      add(7, 11, '山の日');
+      add(10, 3, '文化の日');
+      add(10, 23, '勤労感謝の日');
+
+      // ハッピーマンデー
+      const nthMonday = (m, n) => {
+        let d = 1, count = 0;
+        while (count < n) {
+          if (new Date(year, m, d).getDay() === 1) count++;
+          if (count < n) d++;
+        }
+        return d;
+      };
+      add(0, nthMonday(0, 2), '成人の日');
+      add(6, nthMonday(6, 3), '海の日');
+      add(8, nthMonday(8, 3), '敬老の日');
+      add(9, nthMonday(9, 2), 'スポーツの日');
+
+      // 春分の日・秋分の日（近似計算）
+      const springEquinox = Math.floor(20.8431 + 0.242194 * (year - 1980) - Math.floor((year - 1980) / 4));
+      const autumnEquinox = Math.floor(23.2488 + 0.242194 * (year - 1980) - Math.floor((year - 1980) / 4));
+      add(2, springEquinox, '春分の日');
+      add(8, autumnEquinox, '秋分の日');
+
+      // 振替休日（祝日が日曜→翌月曜）
+      const keys = Object.keys(holidays);
+      keys.forEach(dateStr => {
+        const p = parseDate(dateStr);
+        const dow = new Date(p.year, p.month, p.day).getDay();
+        if (dow === 0) {
+          let nd = p.day + 1;
+          let nKey = formatDate(p.year, p.month, nd);
+          while (holidays[nKey]) { nd++; nKey = formatDate(p.year, p.month, nd); }
+          holidays[nKey] = '振替休日';
+        }
+      });
+
+      // 国民の休日（祝日に挟まれた平日）
+      const allDates = Object.keys(holidays).sort();
+      for (let i = 0; i < allDates.length - 1; i++) {
+        const d1 = parseDate(allDates[i]);
+        const d2 = parseDate(allDates[i + 1]);
+        const t1 = new Date(d1.year, d1.month, d1.day);
+        const t2 = new Date(d2.year, d2.month, d2.day);
+        if ((t2 - t1) === 2 * 86400000) {
+          const mid = new Date(t1.getTime() + 86400000);
+          const midStr = formatDate(mid.getFullYear(), mid.getMonth(), mid.getDate());
+          if (!holidays[midStr] && mid.getDay() !== 0) {
+            holidays[midStr] = '国民の休日';
+          }
+        }
+      }
+
+      return holidays;
+    }
+
+    let holidayCache = {};
+    function getHolidayName(dateStr) {
+      const p = parseDate(dateStr);
+      if (!holidayCache[p.year]) holidayCache[p.year] = getHolidays(p.year);
+      return holidayCache[p.year][dateStr] || null;
+    }
+    const MEMBER_COLORS = [
+      { bg:"#E8F0FE", border:"#4285F4", text:"#1A56DB", dot:"#4285F4" },
+      { bg:"#FEF3E2", border:"#F5A623", text:"#B7791F", dot:"#F5A623" },
+      { bg:"#E6F9EF", border:"#34A853", text:"#276749", dot:"#34A853" },
+      { bg:"#FDE8E8", border:"#EA4335", text:"#C53030", dot:"#EA4335" },
+      { bg:"#F3E8FF", border:"#9B59B6", text:"#6B21A8", dot:"#9B59B6" },
+      { bg:"#E0F7FA", border:"#00ACC1", text:"#006064", dot:"#00ACC1" },
+      { bg:"#FFF3E0", border:"#FF7043", text:"#BF360C", dot:"#FF7043" },
+      { bg:"#F1F8E9", border:"#7CB342", text:"#33691E", dot:"#7CB342" },
+      { bg:"#E8EAF6", border:"#3F51B5", text:"#1A237E", dot:"#3F51B5" },
+      { bg:"#FCE4EC", border:"#E91E63", text:"#880E4F", dot:"#E91E63" },
+      { bg:"#E0F2F1", border:"#009688", text:"#004D40", dot:"#009688" },
+      { bg:"#FFF8E1", border:"#FFC107", text:"#F57F17", dot:"#FFC107" },
+      { bg:"#EFEBE9", border:"#795548", text:"#3E2723", dot:"#795548" },
+      { bg:"#F3E5F5", border:"#AB47BC", text:"#6A1B9A", dot:"#AB47BC" },
+      { bg:"#E1F5FE", border:"#03A9F4", text:"#01579B", dot:"#03A9F4" },
+      { bg:"#F9FBE7", border:"#827717", text:"#524A0A", dot:"#827717" },
+    ];
+
+    // ── State ──
+    let members = [];
+    let events = {};
+    let allEventsRaw = {};
+    let currentMember = null;
+    let viewingMember = null;
+    let filterSet = new Set();
+    let filterInitialized = false;
+    let currentYear = new Date().getFullYear();
+    let currentMonth = new Date().getMonth();
+    let selectedDate = null;
+    let editingEventId = null;
+    let copyMode = false;
+    let unsubMembers = null;
+    let unsubEvents = null;
+    let unsubSyncEvents = null;
+    let syncedEvents = {}; // Events synced from ダイヘン
+    let syncMemberMap = {}; // main memberId -> kd-member name
+
+    function mergeEvents() {
+      // Start with kd-events
+      const merged = {};
+      const mergedRaw = {};
+
+      // Add local kd-events
+      Object.keys(events).forEach(k => {
+        merged[k] = [...(events[k] || [])];
+      });
+      Object.keys(allEventsRaw).forEach(k => {
+        mergedRaw[k] = allEventsRaw[k];
+      });
+
+      // Add synced events (marked as readonly)
+      Object.keys(syncedEvents).forEach(k => {
+        if (!merged[k]) merged[k] = [];
+        syncedEvents[k].forEach(ev => {
+          // Skip if same event already exists locally (avoid duplicates)
+          if (!merged[k].find(e => e._syncId === ev._syncId)) {
+            merged[k].push(ev);
+          }
+        });
+      });
+
+      // Sort each day
+      Object.keys(merged).forEach(k => {
+        merged[k].sort((a,b) => (a.startTime||'').localeCompare(b.startTime||''));
+      });
+
+      return { events: merged, raw: mergedRaw };
+    }
+
+    function getColor(idx, member) {
+      if (member && member.colorIndex !== undefined) {
+        return MEMBER_COLORS[member.colorIndex % MEMBER_COLORS.length];
+      }
+      return MEMBER_COLORS[idx % MEMBER_COLORS.length];
+    }
+    function getMemberColor(memberId) {
+      const m = getMember(memberId);
+      const i = getMemberIndex(memberId);
+      return getColor(i >= 0 ? i : 0, m);
+    }
+    function getMemberIndex(id) { return members.findIndex(m => m.id === id); }
+    function getMember(id) { return members.find(m => m.id === id); }
+    function formatDate(y, m, d) {
+      return `${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    }
+    function parseDate(s) {
+      const [y,m,d] = s.split('-').map(Number);
+      return { year:y, month:m-1, day:d };
+    }
+    function todayStr() {
+      const t = new Date();
+      return formatDate(t.getFullYear(), t.getMonth(), t.getDate());
+    }
+
+    // ── Firebase Realtime Listeners ──
+    const SYNC_MEMBER_NAMES = ['川内', '小川'];
+
+    function startListeners() {
+      // Local Members (kd-members)
+      unsubMembers = db.collection('kd-members').orderBy('createdAt')
+        .onSnapshot(snap => {
+          members = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+          if (!filterInitialized) {
+            if (currentMember) {
+              filterSet = buildInitialFilter(currentMember);
+              filterInitialized = true;
+            } else {
+              filterSet = new Set(members.map(m => m.id));
+            }
+          } else {
+            const validIds = new Set(members.map(m => m.id));
+            filterSet = new Set([...filterSet].filter(id => validIds.has(id)));
+          }
+          renderMemberList();
+          renderLoginMembers();
+          renderCalendar();
+          renderMemberManageList();
+          updateUserBadge();
+        }, err => {
+          console.error('Members listener error:', err);
+          setConnStatus(false);
+        });
+
+      // Local Events (kd-events)
+      unsubEvents = db.collection('kd-events')
+        .onSnapshot(snap => {
+          events = {};
+          allEventsRaw = {};
+          snap.docs.forEach(d => {
+            const data = d.data();
+            const ds = data.dateStart || data.date;
+            const de = data.dateEnd || data.date || ds;
+            const evObj = { id: d.id, ...data, dateStart: ds, dateEnd: de };
+            allEventsRaw[d.id] = evObj;
+            const range = getDateRange(ds, de);
+            range.forEach(dateKey => {
+              if (!events[dateKey]) events[dateKey] = [];
+              events[dateKey].push({ ...evObj, date: dateKey });
+            });
+          });
+          Object.keys(events).forEach(k => {
+            events[k].sort((a,b) => (a.startTime||'').localeCompare(b.startTime||''));
+          });
+          renderCalendar();
+        }, err => {
+          console.error('Events listener error:', err);
+          setConnStatus(false);
+        });
+
+      // ── Sync from ダイヘン (read-only) ──
+      // Step 1: Get main member IDs for 川内/小川
+      db.collection('members').orderBy('createdAt').onSnapshot(mainMembersSnap => {
+        const mainMembers = mainMembersSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+        syncMemberMap = {};
+        mainMembers.forEach(m => {
+          if (SYNC_MEMBER_NAMES.includes(m.name)) {
+            syncMemberMap[m.id] = m.name;
+          }
+        });
+
+        // Step 2: Listen to main events
+        if (unsubSyncEvents) unsubSyncEvents();
+        unsubSyncEvents = db.collection('events').onSnapshot(mainEventsSnap => {
+          syncedEvents = {};
+          mainEventsSnap.docs.forEach(d => {
+            const data = d.data();
+            if (!syncMemberMap[data.memberId]) return; // Not 川内/小川
+
+            const memberName = syncMemberMap[data.memberId];
+            // Find corresponding kd-member
+            const kdMember = members.find(m => m.name === memberName);
+            if (!kdMember) return;
+
+            const ds = data.dateStart || data.date;
+            const de = data.dateEnd || data.date || ds;
+            const evObj = {
+              id: 'sync-' + d.id,
+              _syncId: d.id,
+              _synced: true,
+              memberId: kdMember.id,
+              title: data.title || '',
+              customer: data.customer || '',
+              allDay: data.allDay !== false,
+              startTime: data.startTime || '',
+              endTime: data.endTime || '',
+              memo: data.memo ? '【ダイヘン】' + data.memo : '【ダイヘン】',
+              date: ds,
+              dateStart: ds,
+              dateEnd: de,
+            };
+
+            const range = getDateRange(ds, de);
+            range.forEach(dateKey => {
+              if (!syncedEvents[dateKey]) syncedEvents[dateKey] = [];
+              syncedEvents[dateKey].push({ ...evObj, date: dateKey });
+            });
+          });
+          renderCalendar();
+        });
+      });
+
+      setConnStatus(true);
+    }
+
+    function setConnStatus(online) { /* removed */ }
+
+    // ── Login ──
+    // ── Login Filter ──
+    function buildInitialFilter(loggedInMember) {
+      return new Set(members.map(m => m.id));
+    }
+
+    async function handleLogin() {
+      const name = document.getElementById('login-name').value.trim();
+      if (!name) return;
+
+      let existing = members.find(m => m.name === name);
+      if (!existing) {
+        const ref = await db.collection('kd-members').add({
+          name, createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        existing = { id: ref.id, name };
+      }
+      currentMember = existing;
+      viewingMember = existing;
+      filterSet = buildInitialFilter(existing);
+      filterInitialized = true;
+      localStorage.setItem('kd-schedule-user', name);
+      document.getElementById('login-modal').classList.remove('open');
+      document.getElementById('app').classList.remove('hidden');
+      document.getElementById('loading-screen').classList.add('hidden');
+      renderAll();
+    }
+
+    function renderLoginMembers() {
+      const container = document.getElementById('login-member-tags');
+      const group = document.getElementById('login-members-group');
+      if (members.length === 0) { group.style.display = 'none'; return; }
+      group.style.display = 'block';
+      container.innerHTML = members.map((m, i) => {
+        const c = getColor(i, m);
+        return `<button class="member-tag" onclick="document.getElementById('login-name').value='${m.name}'"
+          style="border-color:${c.border};color:${c.text}">${m.name}</button>`;
+      }).join('');
+    }
+
+    // ── Auto Login ──
+    function tryAutoLogin() {
+      const saved = localStorage.getItem('kd-schedule-user');
+      if (saved) {
+        document.getElementById('login-name').value = saved;
+        // Wait for members to load, then auto-login
+        const check = setInterval(() => {
+          const existing = members.find(m => m.name === saved);
+          if (existing) {
+            clearInterval(check);
+            currentMember = existing;
+            viewingMember = existing;
+            filterSet = buildInitialFilter(existing);
+            filterInitialized = true;
+            document.getElementById('login-modal').classList.remove('open');
+            document.getElementById('app').classList.remove('hidden');
+            document.getElementById('loading-screen').classList.add('hidden');
+            renderAll();
+          }
+        }, 200);
+        // Timeout after 5s
+        setTimeout(() => clearInterval(check), 5000);
+      } else {
+        document.getElementById('loading-screen').classList.add('hidden');
+      }
+    }
+
+    // ── Render All ──
+    function renderAll() {
+      updateUserBadge();
+      renderMemberList();
+      renderCalendar();
+      updateViewingIndicator();
+    }
+
+    function updateUserBadge() {
+      const el = document.getElementById('user-badge');
+      if (!currentMember) { el.innerHTML = ''; return; }
+      const i = getMemberIndex(currentMember.id);
+      const c = getColor(i >= 0 ? i : 0, currentMember);
+      el.style.background = c.bg;
+      el.style.color = c.text;
+      el.innerHTML = `<div class="dot" style="background:${c.dot}"></div>${currentMember.name}`;
+    }
+
+    // ── Sidebar ──
+    function toggleSidebar() {
+      document.getElementById('sidebar').classList.toggle('open');
+      document.getElementById('sidebar-overlay').classList.toggle('open');
+    }
+
+    function renderMemberList() {
+      const container = document.getElementById('member-list');
+      container.innerHTML = members.map((m, i) => {
+        const c = getColor(i, m);
+        const isViewing = viewingMember?.id === m.id;
+        const isFiltered = filterSet.has(m.id);
+        return `
+          <div class="member-item ${isViewing ? 'active' : ''}"
+            style="${isViewing ? `background:${c.bg};border-color:${c.border};color:${c.text}` : ''}"
+            onclick="toggleFilter('${m.id}')">
+            <button class="member-check ${isFiltered ? 'checked' : ''}"
+              style="border-color:${c.dot};${isFiltered ? 'background:'+c.dot : ''}"
+              onclick="event.stopPropagation();toggleFilter('${m.id}')">
+              ${isFiltered ? '<svg viewBox="0 0 10 10" fill="none" stroke="#fff" stroke-width="2"><path d="M2 5L4 7L8 3"/></svg>' : ''}
+            </button>
+            <span class="member-name" style="${isViewing ? 'color:'+c.text : ''}">${m.name}</span>
+          </div>
+        `;
+      }).join('');
+      if (members.length === 0) {
+        container.innerHTML = '<p class="empty-msg">メンバーがいません</p>';
+      }
+    }
+
+    function selectViewing(id) {
+      viewingMember = getMember(id);
+      renderMemberList();
+      updateViewingIndicator();
+      // Close sidebar on mobile
+      document.getElementById('sidebar').classList.remove('open');
+      document.getElementById('sidebar-overlay').classList.remove('open');
+    }
+
+    function toggleFilter(id) {
+      if (filterSet.has(id)) filterSet.delete(id); else filterSet.add(id);
+      renderMemberList();
+      renderCalendar();
+    }
+
+    function filterAll() {
+      filterSet = new Set(members.map(m => m.id));
+      renderMemberList();
+      renderCalendar();
+    }
+
+    function filterNone() {
+      filterSet.clear();
+      renderMemberList();
+      renderCalendar();
+    }
+
+    function updateViewingIndicator() {
+      document.getElementById('viewing-indicator').classList.add('hidden');
+    }
+
+    // ── Calendar ──
+    function renderCalendar() {
+      const title = document.getElementById('month-title');
+      title.textContent = `${currentYear}年 ${currentMonth + 1}月`;
+
+      const header = document.getElementById('cal-header');
+      header.innerHTML = DAYS_JP.map((d, i) =>
+        `<div class="cal-header-cell ${i===0?'sun':i===6?'sat':'weekday'}">${d}</div>`
+      ).join('');
+
+      const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+      const firstDay = new Date(currentYear, currentMonth, 1).getDay();
+      const today = todayStr();
+      const rows = Math.ceil((firstDay + daysInMonth) / 7);
+      const cellGap = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--cell-gap')) || 11;
+
+      // Build date map for each cell
+      function cellDate(week, col) {
+        const d = week * 7 + col - firstDay + 1;
+        if (d < 1 || d > daysInMonth) return null;
+        return formatDate(currentYear, currentMonth, d);
+      }
+
+      // For each week, get multi-day events and assign lanes
+      function getWeekMultiEvents(week) {
+        const weekDates = [];
+        for (let c = 0; c < 7; c++) weekDates.push(cellDate(week, c));
+        const firstDate = weekDates.find(d => d) || '';
+        const lastDate = weekDates.filter(d => d).pop() || '';
+        if (!firstDate) return [];
+
+        const mde = [];
+        const seen = new Set();
+        for (let c = 0; c < 7; c++) {
+          const dt = weekDates[c];
+          if (!dt) continue;
+          const allEvs = [...(events[dt] || []), ...(syncedEvents[dt] || [])];
+          allEvs.forEach(ev => {
+            if (seen.has(ev.id)) return;
+            if (!filterSet.has(ev.memberId)) return;
+            const ds = ev.dateStart || ev.date;
+            const de = ev.dateEnd || ev.date;
+            if (ds === de) return;
+            if (de < firstDate || ds > lastDate) return;
+            seen.add(ev.id);
+            let colStart = 0, colEnd = 6;
+            for (let i = 0; i < 7; i++) {
+              if (weekDates[i] && weekDates[i] >= ds) { colStart = i; break; }
+            }
+            for (let i = 6; i >= 0; i--) {
+              if (weekDates[i] && weekDates[i] <= de) { colEnd = i; break; }
+            }
+            mde.push({ ev, colStart, colEnd, isStart: weekDates.includes(ds), isEnd: weekDates.includes(de) });
+          });
+        }
+        // Assign lanes
+        const myId = currentMember?.id;
+        mde.sort((a, b) => {
+          const aIsMine = a.ev.memberId === myId ? 0 : 1;
+          const bIsMine = b.ev.memberId === myId ? 0 : 1;
+          if (aIsMine !== bIsMine) return aIsMine - bIsMine;
+          return a.colStart - b.colStart || (b.colEnd - b.colStart) - (a.colEnd - a.colStart);
+        });
+        const lanes = [];
+        mde.forEach(s => {
+          let lane = 0;
+          while (true) {
+            if (!lanes[lane]) lanes[lane] = [];
+            const conflict = lanes[lane].some(x => !(s.colStart > x.colEnd || s.colEnd < x.colStart));
+            if (!conflict) { lanes[lane].push(s); s.lane = lane; break; }
+            lane++;
+          }
+        });
+        return { items: mde, laneCount: lanes.length };
+      }
+
+      let html = '';
+      for (let week = 0; week < rows; week++) {
+        const weekMulti = getWeekMultiEvents(week);
+        const multiItems = weekMulti.items || [];
+        const laneCount = weekMulti.laneCount || 0;
+
+        html += '<div class="cal-week">';
+        for (let col = 0; col < 7; col++) {
+          const d = week * 7 + col - firstDay + 1;
+          if (d < 1 || d > daysInMonth) {
+            html += '<div class="cal-cell empty"></div>';
+            continue;
+          }
+
+          const dateStr = formatDate(currentYear, currentMonth, d);
+          const isToday = dateStr === today;
+          const holiday = getHolidayName(dateStr);
+          const dayClass = (col === 0 || holiday) ? 'sun' : col === 6 ? 'sat' : '';
+
+          html += `<div class="cal-cell ${isToday ? 'today' : ''}" onclick="onDayClick('${dateStr}')">`;
+          html += `<div class="cal-day ${dayClass} ${isToday ? 'today' : ''}">${d}</div>`;
+          html += '<div class="cal-events">';
+
+          // Multi-day bar slots for this column
+          for (let lane = 0; lane < laneCount; lane++) {
+            const item = multiItems.find(m => m.lane === lane && m.colStart === col);
+            const occupied = multiItems.find(m => m.lane === lane && col > m.colStart && col <= m.colEnd);
+            if (item) {
+              const span = item.colEnd - item.colStart + 1;
+              const c = getMemberColor(item.ev.memberId);
+              const label = item.ev.customer || item.ev.title || '予定';
+              let cls = 'cont-both';
+              if (!item.isStart && !item.isEnd) cls = 'cont-mid';
+              else if (!item.isStart) cls = 'cont-end';
+              else if (!item.isEnd) cls = 'cont-start';
+              const w = `calc(${span} * 100% + ${(span - 1) * (1 + cellGap)}px)`;
+              html += `<div class="event-chip multi-bar ${cls}" style="width:${w};background:${c.bg};color:${c.text};border-left-color:${c.border}" onclick="event.stopPropagation();onDayClick('${item.ev.dateStart || item.ev.date}')" oncontextmenu="showCtxMenu(event,'${item.ev.dateStart || item.ev.date}','${item.ev.id}')" title="${label}">${item.isStart || col === 0 ? label : ''}</div>`;
+            } else if (occupied) {
+              html += '<div class="event-chip placeholder">.</div>';
+            }
+          }
+
+          // Single-day events
+          const singleEvents = getFilteredEvents(dateStr).filter(ev => {
+            const ds = ev.dateStart || ev.date;
+            const de = ev.dateEnd || ev.date;
+            return ds === de;
+          });
+          singleEvents.forEach(ev => {
+            const c = getMemberColor(ev.memberId);
+            const label = ev.customer || ev.title || '予定';
+            html += `<div class="event-chip" style="background:${c.bg};color:${c.text};border-left-color:${c.border}" oncontextmenu="showCtxMenu(event,'${dateStr}','${ev.id}')">${label}</div>`;
+          });
+          html += '</div></div>';
+        }
+        html += '</div>';
+      }
+
+      document.getElementById('cal-grid').innerHTML = html;
+    }
+
+    function getFilteredEvents(dateStr) {
+      const localEvs = events[dateStr] || [];
+      const syncEvs = syncedEvents[dateStr] || [];
+      const allEvs = [...localEvs, ...syncEvs];
+      if (allEvs.length === 0) return [];
+      const myId = currentMember?.id;
+      // Deduplicate: if same _syncId exists in both, keep local only
+      const seen = new Set();
+      const deduped = [];
+      allEvs.forEach(e => {
+        const key = e._syncId || e.id;
+        if (!seen.has(key)) { seen.add(key); deduped.push(e); }
+      });
+      return deduped
+        .filter(e => filterSet.has(e.memberId))
+        .sort((a, b) => {
+          const aIsMine = a.memberId === myId ? 0 : 1;
+          const bIsMine = b.memberId === myId ? 0 : 1;
+          if (aIsMine !== bIsMine) return aIsMine - bIsMine;
+          const ai = getMemberIndex(a.memberId);
+          const bi = getMemberIndex(b.memberId);
+          if (ai !== bi) return ai - bi;
+          if (a.allDay && !b.allDay) return -1;
+          if (!a.allDay && b.allDay) return 1;
+          return (a.startTime || '').localeCompare(b.startTime || '');
+        });
+    }
+
+    function prevMonth() {
+      if (currentMonth === 0) { currentYear--; currentMonth = 11; } else currentMonth--;
+      renderCalendar();
+    }
+    function nextMonth() {
+      if (currentMonth === 11) { currentYear++; currentMonth = 0; } else currentMonth++;
+      renderCalendar();
+    }
+    function goToday() {
+      const t = new Date();
+      currentYear = t.getFullYear();
+      currentMonth = t.getMonth();
+      renderCalendar();
+    }
+
+    function onDayClick(dateStr) {
+      selectedDate = dateStr;
+      const dayEvents = getFilteredEvents(dateStr);
+      if (dayEvents.length > 0) {
+        openDayModal(dateStr);
+      } else if (members.length > 0) {
+        editingEventId = null;
+        openEventModal(dateStr);
+      }
+    }
+
+    // ── Day Detail Modal ──
+    let bulkMode = false;
+
+    function openDayModal(dateStr) {
+      const p = parseDate(dateStr);
+      const dow = DAYS_JP[new Date(p.year, p.month, p.day).getDay()];
+      document.getElementById('day-modal-title').textContent = `${p.year}年${p.month+1}月${p.day}日（${dow}）`;
+      bulkMode = false;
+
+      const dayEvents = getFilteredEvents(dateStr);
+      let html = '';
+
+      // Bulk bar
+      html += `<div class="bulk-bar" id="bulk-bar">
+        <button class="btn btn-secondary btn-sm" onclick="toggleBulkMode('${dateStr}')">☑ 選択削除モード</button>
+        <div style="display:flex;gap:6px" id="bulk-actions" class="hidden">
+          <button class="btn btn-secondary btn-sm" onclick="bulkSelectAll('${dateStr}')">全選択</button>
+          <button class="btn btn-primary btn-sm" style="background:var(--danger);border-color:var(--danger)" onclick="bulkDelete('${dateStr}')">🗑 選択削除</button>
+        </div>
+      </div>`;
+
+      dayEvents.forEach(ev => {
+        const c = getMemberColor(ev.memberId);
+        const member = getMember(ev.memberId);
+        const isSynced = !!ev._synced;
+        html += `
+          <div class="event-card-row">
+            ${!isSynced ? `<input type="checkbox" class="ev-checkbox hidden" data-evid="${ev.id}" onchange="updateBulkCount()">` : ''}
+            <div class="event-card" style="background:${c.bg};border-left-color:${c.border}${isSynced ? ';opacity:0.8' : ''}">
+              <div class="event-card-header">
+                <div>
+                  <div class="event-card-title" style="color:${c.text}">${isSynced ? '🔗 ' : ''}${ev.customer ? ev.customer + " / " + (ev.title || 'その他') : (ev.title || '予定')}</div>
+                  <div class="event-card-info">🕐 ${ev.allDay ? '終日' : ev.startTime + ' ～ ' + ev.endTime}${(ev.dateStart && ev.dateEnd && ev.dateStart !== ev.dateEnd) ? ' 📅 ' + ev.dateStart + '～' + ev.dateEnd : ''}</div>
+                  <div class="event-card-info">👤 ${member?.name || '不明'}${isSynced ? ' <span style="font-size:10px;color:var(--accent)">（ダイヘン）</span>' : ''}</div>
+                  ${ev.memo ? `<div class="event-card-info" style="margin-top:4px">📝 ${ev.memo}</div>` : ''}
+                </div>
+                ${!isSynced ? `<div class="event-card-actions" style="display:flex;gap:4px;flex-shrink:0">
+                  <button class="btn btn-secondary" style="padding:4px 10px;font-size:11px;min-width:auto"
+                    onclick="copyEvent('${dateStr}','${ev.id}')">コピー</button>
+                  <button class="btn btn-secondary" style="padding:4px 10px;font-size:11px;min-width:auto"
+                    onclick="editEvent('${dateStr}','${ev.id}')">編集</button>
+                  <button class="btn btn-secondary" style="padding:4px 10px;font-size:11px;min-width:auto;color:var(--danger);border-color:var(--danger)"
+                    onclick="deleteEvent('${dateStr}','${ev.id}')">削除</button>
+                </div>` : '<div style="font-size:10px;color:var(--text-muted);white-space:nowrap">読取専用</div>'}
+              </div>
+            </div>
+          </div>
+        `;
+      });
+      if (dayEvents.length === 0) {
+        html += '<p class="empty-msg">予定がありません</p>';
+      }
+      if (members.length > 0) {
+        html += `
+          <button class="btn btn-primary btn-full btn-icon" style="margin-top:12px" onclick="closeDayModal();editingEventId=null;openEventModal('${dateStr}')">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M7 3V11M3 7H11"/></svg>
+            予定を追加
+          </button>
+        `;
+      }
+      document.getElementById('day-modal-body').innerHTML = html;
+      document.getElementById('day-modal').classList.add('open');
+    }
+
+    function toggleBulkMode(dateStr) {
+      bulkMode = !bulkMode;
+      document.querySelectorAll('.ev-checkbox').forEach(cb => {
+        cb.classList.toggle('hidden', !bulkMode);
+        cb.checked = false;
+      });
+      document.getElementById('bulk-actions').classList.toggle('hidden', !bulkMode);
+    }
+
+    function bulkSelectAll(dateStr) {
+      const cbs = document.querySelectorAll('.ev-checkbox');
+      const allChecked = Array.from(cbs).every(cb => cb.checked);
+      cbs.forEach(cb => cb.checked = !allChecked);
+    }
+
+    function updateBulkCount() {}
+
+    async function bulkDelete(dateStr) {
+      const checked = document.querySelectorAll('.ev-checkbox:checked');
+      if (checked.length === 0) { alert('削除する予定を選択してください'); return; }
+      if (!confirm(`${checked.length}件の予定を削除しますか？`)) return;
+      try {
+        for (const cb of checked) {
+          const evId = cb.dataset.evid;
+          const ev = (events[dateStr] || []).find(e => e.id === evId);
+          await db.collection('kd-events').doc(evId).delete();
+          if (ev) {
+            const member = getMember(ev.memberId);
+            await writeLog('delete', `${member?.name || '不明'}の「${ev.title}」を削除`, dateStr);
+          }
+        }
+        const dayModal = document.getElementById('day-modal');
+        if (dayModal.classList.contains('open')) openDayModal(dateStr);
+      } catch (err) {
+        alert('削除に失敗しました: ' + err.message);
+      }
+    }
+
+    function closeDayModal() {
+      document.getElementById('day-modal').classList.remove('open');
+    }
+
+    // ── Event Modal ──
+    function populateMemberCheckboxes(selectedIds) {
+      if (!Array.isArray(selectedIds)) selectedIds = selectedIds ? [selectedIds] : [];
+      const container = document.getElementById('ev-member-list');
+      container.innerHTML = members.map((m, i) => {
+        const c = getColor(i, m);
+        const checked = selectedIds.includes(m.id);
+        return `
+          <label class="member-checkbox-item ${checked ? 'checked' : ''}" id="mcb-${m.id}"
+            style="border-color:${c.border};color:${c.text};background:${checked ? c.bg : '#fff'}">
+            <input type="checkbox" value="${m.id}" ${checked ? 'checked' : ''}
+              onchange="onMemberCheckChange('${m.id}', ${i})">
+            <span class="check-mark" style="border-color:${c.dot}">
+              <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="#fff" stroke-width="2"><path d="M2 5L4 7L8 3"/></svg>
+            </span>
+            ${m.name}
+          </label>
+        `;
+      }).join('');
+    }
+
+    function onMemberCheckChange(memberId, colorIndex) {
+      const label = document.getElementById('mcb-' + memberId);
+      const input = label.querySelector('input');
+      const c = getMemberColor(memberId);
+      if (input.checked) {
+        label.classList.add('checked');
+        label.style.background = c.bg;
+      } else {
+        label.classList.remove('checked');
+        label.style.background = '#fff';
+      }
+    }
+
+    function getSelectedMemberIds() {
+      const checkboxes = document.querySelectorAll('#ev-member-list input[type="checkbox"]:checked');
+      return Array.from(checkboxes).map(cb => cb.value);
+    }
+
+    function toggleAllDay() {
+      const checked = document.getElementById('ev-allday').checked;
+      document.getElementById('ev-time-row').style.display = checked ? 'none' : 'flex';
+    }
+
+    function openEventModal(dateStr) {
+      selectedDate = dateStr;
+      const defaultMember = viewingMember ? viewingMember.id : (currentMember ? currentMember.id : '');
+      
+      if (!editingEventId && !copyMode) {
+        populateMemberCheckboxes([defaultMember]);
+        document.getElementById('ev-date').value = dateStr;
+        document.getElementById('ev-date-end').value = dateStr;
+        document.getElementById('ev-date-end-group').style.display = 'block';
+        document.getElementById('event-modal-title').textContent = '予定を追加';
+        document.getElementById('ev-title').selectedIndex = 0;
+        document.getElementById('ev-title').classList.add('placeholder');
+        document.getElementById('ev-customer').value = '';
+        document.getElementById('ev-start').value = '09:00';
+        document.getElementById('ev-end').value = '10:00';
+        document.getElementById('ev-allday').checked = true;
+        document.getElementById('ev-time-row').style.display = 'none';
+        document.getElementById('ev-memo').value = '';
+        document.querySelector('#event-modal .form-actions .btn-primary').textContent = '追加する';
+      }
+      copyMode = false;
+
+      document.getElementById('event-modal').classList.add('open');
+      setTimeout(() => document.getElementById('ev-title').focus(), 100);
+    }
+
+    function closeEventModal() {
+      document.getElementById('event-modal').classList.remove('open');
+      editingEventId = null;
+    }
+
+    function openAddEvent() {
+      if (members.length === 0) return;
+      editingEventId = null;
+      selectedDate = todayStr();
+      openEventModal(selectedDate);
+    }
+
+    function editEvent(dateStr, eventId) {
+      const ev = allEventsRaw[eventId] || (events[dateStr] || []).find(e => e.id === eventId);
+      if (!ev) return;
+
+      editingEventId = eventId;
+      selectedDate = ev.dateStart || ev.date || dateStr;
+      document.getElementById('event-modal-title').textContent = '予定を編集';
+      document.getElementById('ev-title').value = ev.title;
+        document.getElementById('ev-title').classList.remove('placeholder');
+      document.getElementById('ev-customer').value = ev.customer || '';
+      document.getElementById('ev-start').value = ev.startTime || '09:00';
+      document.getElementById('ev-end').value = ev.endTime || '10:00';
+      document.getElementById('ev-allday').checked = !!ev.allDay;
+      document.getElementById('ev-time-row').style.display = ev.allDay ? 'none' : 'flex';
+      document.getElementById('ev-memo').value = ev.memo || '';
+      document.getElementById('ev-date').value = ev.dateStart || ev.date || dateStr;
+      document.getElementById('ev-date-end').value = ev.dateEnd || ev.date || dateStr;
+      document.getElementById('ev-date-end-group').style.display = 'block';
+      document.querySelector('#event-modal .form-actions .btn-primary').textContent = '更新する';
+
+      closeDayModal();
+      populateMemberCheckboxes([ev.memberId]);
+      openEventModal(selectedDate);
+    }
+
+    function copyEvent(dateStr, eventId) {
+      const ev = allEventsRaw[eventId] || (events[dateStr] || []).find(e => e.id === eventId);
+      if (!ev) return;
+
+      editingEventId = null;
+      copyMode = true;
+      document.getElementById('event-modal-title').textContent = '予定をコピー';
+      document.getElementById('ev-title').value = ev.title;
+        document.getElementById('ev-title').classList.remove('placeholder');
+      document.getElementById('ev-customer').value = ev.customer || '';
+      document.getElementById('ev-start').value = ev.startTime || '09:00';
+      document.getElementById('ev-end').value = ev.endTime || '10:00';
+      document.getElementById('ev-allday').checked = !!ev.allDay;
+      document.getElementById('ev-time-row').style.display = ev.allDay ? 'none' : 'flex';
+      document.getElementById('ev-memo').value = ev.memo || '';
+      document.getElementById('ev-date-end-group').style.display = 'block';
+      document.querySelector('#event-modal .form-actions .btn-primary').textContent = '追加する';
+
+      closeDayModal();
+      populateMemberCheckboxes([ev.memberId]);
+      document.getElementById('ev-date').value = ev.dateStart || dateStr;
+      document.getElementById('ev-date-end').value = ev.dateEnd || dateStr;
+      openEventModal(dateStr);
+    }
+
+    function getDateRange(startStr, endStr) {
+      const dates = [];
+      const s = new Date(startStr);
+      const e = new Date(endStr);
+      if (isNaN(s) || isNaN(e) || e < s) return [startStr];
+      const cur = new Date(s);
+      while (cur <= e) {
+        dates.push(formatDate(cur.getFullYear(), cur.getMonth(), cur.getDate()));
+        cur.setDate(cur.getDate() + 1);
+      }
+      return dates;
+    }
+
+    async function saveEvent() {
+      const title = document.getElementById('ev-title').value.trim();
+      const customer = document.getElementById('ev-customer').value.trim();
+      const memberIds = getSelectedMemberIds();
+      const dateStart = document.getElementById('ev-date').value;
+      const dateEnd = document.getElementById('ev-date-end').value || dateStart;
+      if (!title || !dateStart || memberIds.length === 0) {
+        if (!title) alert('内容を入力してください');
+        else if (memberIds.length === 0) alert('対象メンバーを1人以上選択してください');
+        return;
+      }
+
+      const isAllDay = document.getElementById('ev-allday').checked;
+      const baseData = {
+        title,
+        customer,
+        allDay: isAllDay,
+        startTime: isAllDay ? '' : document.getElementById('ev-start').value,
+        endTime: isAllDay ? '' : document.getElementById('ev-end').value,
+        memo: document.getElementById('ev-memo').value.trim(),
+        date: dateStart,
+        dateStart,
+        dateEnd: dateEnd < dateStart ? dateStart : dateEnd,
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      };
+
+      try {
+        if (editingEventId) {
+          await db.collection('kd-events').doc(editingEventId).delete();
+          for (const memberId of memberIds) {
+            await db.collection('kd-events').add({
+              ...baseData, memberId,
+              createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+            });
+          }
+          const mNames = memberIds.map(id => getMember(id)?.name || '不明').join(',');
+          const days = getDateRange(dateStart, dateEnd).length;
+          await writeLog('edit', `${mNames}の「${customer || title}」を編集${days > 1 ? `（${days}日間）` : ''}`, dateStart);
+        } else {
+          for (const memberId of memberIds) {
+            await db.collection('kd-events').add({
+              ...baseData, memberId,
+              createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+            });
+            const mName = getMember(memberId)?.name || '不明';
+            const days = getDateRange(dateStart, dateEnd).length;
+            await writeLog('add', `${mName}の「${customer || title}」を追加${days > 1 ? `（${days}日間）` : ''}`, dateStart);
+          }
+        }
+        closeEventModal();
+      } catch (err) {
+        alert('保存に失敗しました: ' + err.message);
+      }
+    }
+
+    async function deleteEvent(dateStr, eventId) {
+      if (!confirm('この予定を削除しますか？')) return;
+      try {
+        const ev = (events[dateStr] || []).find(e => e.id === eventId);
+        await db.collection('kd-events').doc(eventId).delete();
+        if (ev) {
+          const member = getMember(ev.memberId);
+          await writeLog('delete', `${member?.name || '不明'}の「${ev.title}」を削除`, dateStr);
+        }
+        const dayModal = document.getElementById('day-modal');
+        if (dayModal.classList.contains('open')) {
+          openDayModal(dateStr);
+        }
+      } catch (err) {
+        alert('削除に失敗しました: ' + err.message);
+      }
+    }
+
+    // ── Member Modal ──
+    function openMemberModal() {
+      renderMemberManageList();
+      document.getElementById('member-modal').classList.add('open');
+    }
+    function closeMemberModal() {
+      document.getElementById('member-modal').classList.remove('open');
+    }
+
+    function renderMemberManageList() {
+      const container = document.getElementById('member-manage-list');
+      if (!container) return;
+      container.innerHTML = members.map((m, i) => {
+        const c = getColor(i, m);
+        const swatches = MEMBER_COLORS.map((clr, ci) => {
+          const selected = (m.colorIndex !== undefined ? m.colorIndex : i) % MEMBER_COLORS.length === ci;
+          return `<div class="color-swatch ${selected ? 'selected' : ''}"
+            style="background:${clr.dot}" onclick="event.stopPropagation();changeMemberColor('${m.id}',${ci})"></div>`;
+        }).join('');
+        return `
+          <div class="member-manage-item" style="background:${c.bg};border:1px solid ${c.border}30">
+            <div class="member-manage-left">
+              <div class="member-manage-dot" style="background:${c.dot}"></div>
+              <span class="member-manage-name" style="color:${c.text}" id="mname-${m.id}" ondblclick="startEditName('${m.id}')">${m.name}</span>
+              <input class="form-input member-name-edit hidden" id="mname-input-${m.id}"
+                value="${m.name}" style="font-size:13px;padding:4px 8px;margin:0;width:100px"
+                onkeydown="if(event.key==='Enter')saveNameEdit('${m.id}');if(event.key==='Escape')cancelNameEdit('${m.id}')"
+                onblur="saveNameEdit('${m.id}')">
+              ${m.id === currentMember?.id ? `<span class="you-badge" style="background:${c.border}">あなた</span>` : ''}
+              <button class="event-action-btn" style="border:1px solid ${c.border}40;color:${c.text};padding:3px" title="名前を編集"
+                onclick="startEditName('${m.id}')">
+                <svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M8.5 2.5L11.5 5.5M1.5 10.5L1 13L3.5 12.5L12 4L10 2L1.5 10.5Z"/></svg>
+              </button>
+            </div>
+            <div class="color-swatches">${swatches}</div>
+            <button class="event-action-btn delete" onclick="removeMember('${m.id}')">
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M2 4H12M5 4V2.5C5 2.2 5.2 2 5.5 2H8.5C8.8 2 9 2.2 9 2.5V4M3.5 4V12C3.5 12.3 3.7 12.5 4 12.5H10C10.3 12.5 10.5 12.3 10.5 12V4"/></svg>
+            </button>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function startEditName(id) {
+      document.getElementById('mname-' + id).classList.add('hidden');
+      const input = document.getElementById('mname-input-' + id);
+      input.classList.remove('hidden');
+      input.focus();
+      input.select();
+    }
+
+    function cancelNameEdit(id) {
+      const m = getMember(id);
+      const input = document.getElementById('mname-input-' + id);
+      input.value = m ? m.name : '';
+      input.classList.add('hidden');
+      document.getElementById('mname-' + id).classList.remove('hidden');
+    }
+
+    async function saveNameEdit(id) {
+      const input = document.getElementById('mname-input-' + id);
+      if (input.classList.contains('hidden')) return;
+      const newName = input.value.trim();
+      const m = getMember(id);
+      if (!newName || newName === m?.name) {
+        cancelNameEdit(id);
+        return;
+      }
+      if (members.find(x => x.name === newName && x.id !== id)) {
+        alert('同じ名前のメンバーが既に存在します');
+        cancelNameEdit(id);
+        return;
+      }
+      try {
+        await db.collection('kd-members').doc(id).update({ name: newName });
+        if (currentMember?.id === id) {
+          localStorage.setItem('kd-schedule-user', newName);
+        }
+        await writeLog('member', `メンバー名を「${m.name}」→「${newName}」に変更`);
+      } catch (err) {
+        alert('名前の変更に失敗しました: ' + err.message);
+        cancelNameEdit(id);
+      }
+    }
+
+    async function changeMemberColor(id, colorIndex) {
+      try {
+        await db.collection('kd-members').doc(id).update({ colorIndex });
+      } catch (err) {
+        alert('色の変更に失敗しました: ' + err.message);
+      }
+    }
+
+    async function addMember() {
+      const name = document.getElementById('new-member-name').value.trim();
+      if (!name) return;
+      if (members.find(m => m.name === name)) { alert('同じ名前のメンバーが既に存在します'); return; }
+      try {
+        await db.collection('kd-members').add({
+          name, createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        document.getElementById('new-member-name').value = '';
+        await writeLog('member', `メンバー「${name}」を追加`);
+      } catch (err) {
+        alert('追加に失敗しました: ' + err.message);
+      }
+    }
+
+    async function removeMember(id) {
+      if (!confirm('このメンバーを削除しますか？関連する予定も全て削除されます。')) return;
+      const member = getMember(id);
+      try {
+        await db.collection('kd-members').doc(id).delete();
+        const snap = await db.collection('kd-events').where('memberId', '==', id).get();
+        const batch = db.batch();
+        snap.docs.forEach(d => batch.delete(d.ref));
+        await batch.commit();
+        if (viewingMember?.id === id) viewingMember = currentMember;
+        await writeLog('member', `メンバー「${member?.name || '不明'}」を削除（予定${snap.size}件も削除）`);
+      } catch (err) {
+        alert('削除に失敗しました: ' + err.message);
+      }
+    }
+
+    // ── Edit Log ──
+    async function writeLog(type, message, date) {
+      try {
+        await db.collection('kd-logs').add({
+          type, // 'add', 'edit', 'delete', 'member'
+          message,
+          date: date || null,
+          user: currentMember?.name || '不明',
+          timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+        });
+      } catch (err) {
+        console.error('Log write error:', err);
+      }
+    }
+
+    let logLastDoc = null;
+    const LOG_PAGE_SIZE = 30;
+
+    // ── Admin Modal ──
+    function openAdminModal() {
+      switchAdminTab('backup');
+      document.getElementById('admin-modal').classList.add('open');
+    }
+    function closeAdminModal() {
+      document.getElementById('admin-modal').classList.remove('open');
+    }
+    function switchAdminTab(tab) {
+      document.querySelectorAll('.admin-tab').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.tab === tab);
+        if (btn.dataset.tab === tab) { btn.style.background = 'var(--accent)'; btn.style.color = '#fff'; }
+        else { btn.style.background = ''; btn.style.color = ''; }
+      });
+      document.querySelectorAll('.admin-tab-content').forEach(el => el.style.display = 'none');
+      const target = document.getElementById('admin-tab-' + tab);
+      if (target) target.style.display = 'block';
+      if (tab === 'log') {
+        logLastDoc = null;
+        document.getElementById('log-list').innerHTML = '<p class="empty-msg">読み込み中...</p>';
+        loadLogs(true);
+      }
+      if (tab === 'backup') {
+        document.getElementById('backup-import-status').innerHTML = '';
+        loadAutoBackups();
+      }
+    }
+
+    async function openLogModal() { openAdminModal(); switchAdminTab('log'); }
+    function closeLogModal() { closeAdminModal(); }
+    function openBackupModal() { openAdminModal(); switchAdminTab('backup'); }
+    function closeBackupModal() { closeAdminModal(); }
+
+    async function loadLogs(reset) {
+      try {
+        let query = db.collection('kd-logs').orderBy('timestamp', 'desc').limit(LOG_PAGE_SIZE);
+        if (!reset && logLastDoc) {
+          query = query.startAfter(logLastDoc);
+        }
+        const snap = await query.get();
+        logLastDoc = snap.docs.length > 0 ? snap.docs[snap.docs.length - 1] : null;
+
+        let html = '';
+        if (reset && snap.docs.length === 0) {
+          html = '<p class="empty-msg">履歴はまだありません</p>';
+        }
+        snap.docs.forEach(d => {
+          const data = d.data();
+          const typeClass = data.type === 'add' ? 'log-add' : data.type === 'edit' ? 'log-edit' : data.type === 'delete' ? 'log-delete' : 'log-member';
+          const icon = data.type === 'add' ? '➕' : data.type === 'edit' ? '✏️' : data.type === 'delete' ? '🗑️' : '👤';
+          const ts = data.timestamp?.toDate();
+          const timeStr = ts ? `${ts.getFullYear()}/${(ts.getMonth()+1).toString().padStart(2,'0')}/${ts.getDate().toString().padStart(2,'0')} ${ts.getHours().toString().padStart(2,'0')}:${ts.getMinutes().toString().padStart(2,'0')}` : '';
+          html += `
+            <div class="log-item ${typeClass}">
+              ${icon} ${data.message}
+              <div class="log-meta">${timeStr}${data.date ? ` ・ 対象日: ${data.date}` : ''} ・ 操作者: ${data.user}</div>
+            </div>
+          `;
+        });
+
+        if (reset) {
+          document.getElementById('log-list').innerHTML = html;
+        } else {
+          document.getElementById('log-list').insertAdjacentHTML('beforeend', html);
+        }
+
+        document.getElementById('log-load-more').style.display =
+          snap.docs.length >= LOG_PAGE_SIZE ? 'block' : 'none';
+      } catch (err) {
+        document.getElementById('log-list').innerHTML = '<p class="empty-msg">履歴の読み込みに失敗しました</p>';
+      }
+    }
+
+    function loadMoreLogs() {
+      loadLogs(false);
+    }
+
+    function refreshData() {
+      if (unsubMembers) unsubMembers();
+      if (unsubEvents) unsubEvents();
+      if (unsubSyncEvents) unsubSyncEvents();
+      startListeners();
+    }
+
+    // ── Backup ──
+
+    async function exportBackup() {
+      try {
+        const membersSnap = await db.collection('kd-members').orderBy('createdAt').get();
+        const eventsSnap = await db.collection('kd-events').get();
+
+        const backup = {
+          version: 1,
+          exportedAt: new Date().toISOString(),
+          members: membersSnap.docs.map(d => ({ id: d.id, ...d.data() })),
+          events: eventsSnap.docs.map(d => {
+            const data = d.data();
+            // Convert Timestamps to ISO strings
+            if (data.createdAt?.toDate) data.createdAt = data.createdAt.toDate().toISOString();
+            if (data.updatedAt?.toDate) data.updatedAt = data.updatedAt.toDate().toISOString();
+            return { id: d.id, ...data };
+          }),
+        };
+
+        const json = JSON.stringify(backup, null, 2);
+        const blob = new Blob([json], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        const now = new Date();
+        const dateStr = `${now.getFullYear()}${(now.getMonth()+1).toString().padStart(2,'0')}${now.getDate().toString().padStart(2,'0')}`;
+        a.href = url;
+        a.download = `schedule-backup-${dateStr}.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+
+        await writeLog('member', `バックアップを保存（メンバー${backup.members.length}名、予定${backup.events.length}件）`);
+        alert(`バックアップ完了\nメンバー: ${backup.members.length}名\n予定: ${backup.events.length}件`);
+      } catch (err) {
+        alert('バックアップに失敗しました: ' + err.message);
+      }
+    }
+
+    function handleBackupFile(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = async function(e) {
+        try {
+          const backup = JSON.parse(e.target.result);
+          if (!backup.members || !backup.events) {
+            alert('正しいバックアップファイルではありません');
+            return;
+          }
+          const statusEl = document.getElementById('backup-import-status');
+          statusEl.innerHTML = `<strong>ファイル内容:</strong> メンバー${backup.members.length}名、予定${backup.events.length}件`;
+
+          if (!confirm(`以下のデータを復元します。既存データに追加されます。\n\nメンバー: ${backup.members.length}名\n予定: ${backup.events.length}件\n\n続行しますか？`)) return;
+
+          statusEl.innerHTML = '復元中...';
+
+          // Create member ID mapping (old ID → new ID)
+          const memberMap = {};
+          const existingSnap = await db.collection('kd-members').get();
+          const existingByName = {};
+          existingSnap.docs.forEach(d => { existingByName[d.data().name] = d.id; });
+
+          for (const m of backup.members) {
+            if (existingByName[m.name]) {
+              memberMap[m.id] = existingByName[m.name];
+            } else {
+              const ref = await db.collection('kd-members').add({
+                name: m.name,
+                colorIndex: m.colorIndex,
+                createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+              });
+              memberMap[m.id] = ref.id;
+            }
+          }
+
+          // Import events in batches
+          let imported = 0;
+          const BATCH_SIZE = 400;
+          for (let i = 0; i < backup.events.length; i += BATCH_SIZE) {
+            const batch = db.batch();
+            const chunk = backup.events.slice(i, i + BATCH_SIZE);
+            for (const ev of chunk) {
+              const newMemberId = memberMap[ev.memberId];
+              if (!newMemberId) continue;
+              const ref = db.collection('kd-events').doc();
+              batch.set(ref, {
+                date: ev.date,
+                memberId: newMemberId,
+                title: ev.title || '',
+                customer: ev.customer || '',
+                allDay: ev.allDay !== false,
+                startTime: ev.startTime || '',
+                endTime: ev.endTime || '',
+                memo: ev.memo || '',
+                createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+              });
+              imported++;
+            }
+            await batch.commit();
+          }
+
+          await writeLog('member', `バックアップから復元（${imported}件）`);
+          statusEl.innerHTML = `<span style="color:var(--accent)">✅ 復元完了！ ${imported}件の予定を追加しました</span>`;
+          alert(`復元完了！\n${imported}件の予定を追加しました`);
+        } catch (err) {
+          alert('復元に失敗しました: ' + err.message);
+        }
+      };
+      reader.readAsText(file);
+      event.target.value = '';
+    }
+
+    // ── Auto Backup ──
+    const AUTO_BACKUP_INTERVAL = 60 * 60 * 1000; // 1 hour
+    const MAX_AUTO_BACKUPS = 24;
+
+    async function runAutoBackup() {
+      try {
+        const membersSnap = await db.collection('kd-members').orderBy('createdAt').get();
+        const eventsSnap = await db.collection('kd-events').get();
+        const backup = {
+          members: membersSnap.docs.map(d => ({ id: d.id, ...d.data() })),
+          events: eventsSnap.docs.map(d => {
+            const data = d.data();
+            if (data.createdAt?.toDate) data.createdAt = data.createdAt.toDate().toISOString();
+            if (data.updatedAt?.toDate) data.updatedAt = data.updatedAt.toDate().toISOString();
+            return { id: d.id, ...data };
+          }),
+        };
+
+        await db.collection('kd-autoBackups').add({
+          timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+          memberCount: backup.members.length,
+          eventCount: backup.events.length,
+          data: JSON.stringify(backup),
+          user: currentMember?.name || 'システム',
+        });
+
+        // Prune old backups
+        const allSnap = await db.collection('kd-autoBackups').orderBy('timestamp', 'desc').get();
+        if (allSnap.docs.length > MAX_AUTO_BACKUPS) {
+          const toDelete = allSnap.docs.slice(MAX_AUTO_BACKUPS);
+          const batch = db.batch();
+          toDelete.forEach(d => batch.delete(d.ref));
+          await batch.commit();
+        }
+
+        console.log('Auto backup completed');
+        updateAutoBackupStatus();
+      } catch (err) {
+        console.error('Auto backup failed:', err);
+      }
+    }
+
+    function updateAutoBackupStatus() {
+      const el = document.getElementById('auto-backup-status');
+      if (!el) return;
+      const now = new Date();
+      el.textContent = `最終: ${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')} / 次回: 1時間後`;
+    }
+
+    async function loadAutoBackups() {
+      const container = document.getElementById('auto-backup-list');
+      container.innerHTML = '<p class="empty-msg">読み込み中...</p>';
+      try {
+        const snap = await db.collection('kd-autoBackups').orderBy('timestamp', 'desc').limit(MAX_AUTO_BACKUPS).get();
+        if (snap.docs.length === 0) {
+          container.innerHTML = '<p class="empty-msg">自動バックアップはまだありません</p>';
+          return;
+        }
+        container.innerHTML = snap.docs.map(d => {
+          const data = d.data();
+          const ts = data.timestamp?.toDate();
+          const timeStr = ts ? `${ts.getFullYear()}/${(ts.getMonth()+1).toString().padStart(2,'0')}/${ts.getDate().toString().padStart(2,'0')} ${ts.getHours().toString().padStart(2,'0')}:${ts.getMinutes().toString().padStart(2,'0')}` : '不明';
+          return `
+            <div class="backup-item">
+              <div>
+                <div class="backup-date">${timeStr}</div>
+                <div class="backup-info">メンバー${data.memberCount}名 / 予定${data.eventCount}件 / ${data.user}</div>
+              </div>
+              <div class="backup-actions">
+                <button class="btn btn-secondary" style="padding:3px 8px;font-size:10px" onclick="downloadAutoBackup('${d.id}')">📥</button>
+                <button class="btn btn-secondary" style="padding:3px 8px;font-size:10px" onclick="restoreAutoBackup('${d.id}')">復元</button>
+              </div>
+            </div>
+          `;
+        }).join('');
+      } catch (err) {
+        container.innerHTML = '<p class="empty-msg">読み込みに失敗しました</p>';
+      }
+    }
+
+    async function downloadAutoBackup(id) {
+      try {
+        const doc = await db.collection('kd-autoBackups').doc(id).get();
+        const data = doc.data();
+        const backup = JSON.parse(data.data);
+        backup.version = 1;
+        backup.exportedAt = data.timestamp?.toDate()?.toISOString() || new Date().toISOString();
+
+        const json = JSON.stringify(backup, null, 2);
+        const blob = new Blob([json], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        const ts = data.timestamp?.toDate();
+        const dateStr = ts ? `${ts.getFullYear()}${(ts.getMonth()+1).toString().padStart(2,'0')}${ts.getDate().toString().padStart(2,'0')}_${ts.getHours().toString().padStart(2,'0')}${ts.getMinutes().toString().padStart(2,'0')}` : 'unknown';
+        a.href = url;
+        a.download = `auto-backup-${dateStr}.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+      } catch (err) {
+        alert('ダウンロードに失敗しました: ' + err.message);
+      }
+    }
+
+    async function restoreAutoBackup(id) {
+      if (!confirm('このバックアップから復元しますか？\n既存データに追加されます。')) return;
+      try {
+        const doc = await db.collection('kd-autoBackups').doc(id).get();
+        const backupData = doc.data();
+        const backup = JSON.parse(backupData.data);
+
+        const existingSnap = await db.collection('kd-members').get();
+        const existingByName = {};
+        existingSnap.docs.forEach(d => { existingByName[d.data().name] = d.id; });
+
+        const memberMap = {};
+        for (const m of backup.members) {
+          if (existingByName[m.name]) {
+            memberMap[m.id] = existingByName[m.name];
+          } else {
+            const ref = await db.collection('kd-members').add({
+              name: m.name, colorIndex: m.colorIndex,
+              createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+            });
+            memberMap[m.id] = ref.id;
+          }
+        }
+
+        let imported = 0;
+        const BATCH_SIZE = 400;
+        for (let i = 0; i < backup.events.length; i += BATCH_SIZE) {
+          const batch = db.batch();
+          backup.events.slice(i, i + BATCH_SIZE).forEach(ev => {
+            const newMemberId = memberMap[ev.memberId];
+            if (!newMemberId) return;
+            const ref = db.collection('kd-events').doc();
+            batch.set(ref, {
+              date: ev.date, dateStart: ev.dateStart || ev.date, dateEnd: ev.dateEnd || ev.date,
+              memberId: newMemberId, title: ev.title || '', customer: ev.customer || '',
+              allDay: ev.allDay !== false, startTime: ev.startTime || '', endTime: ev.endTime || '',
+              memo: ev.memo || '',
+              createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+              updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+            });
+            imported++;
+          });
+          await batch.commit();
+        }
+        await writeLog('member', `自動バックアップから復元（${imported}件）`);
+        alert(`復元完了！ ${imported}件の予定を追加しました`);
+      } catch (err) {
+        alert('復元に失敗しました: ' + err.message);
+      }
+    }
+
+    // Start auto backup timer
+    setInterval(runAutoBackup, AUTO_BACKUP_INTERVAL);
+    // Run first backup 30 seconds after load
+    setTimeout(runAutoBackup, 30000);
+
+    // ── Context Menu ──
+    let ctxDateStr = '';
+    let ctxEventId = '';
+
+    function showCtxMenu(e, dateStr, eventId) {
+      e.preventDefault();
+      e.stopPropagation();
+      ctxDateStr = dateStr;
+      ctxEventId = eventId;
+      const menu = document.getElementById('ctx-menu');
+      menu.classList.add('open');
+      // Position
+      let x = e.clientX, y = e.clientY;
+      menu.style.left = x + 'px';
+      menu.style.top = y + 'px';
+      // Adjust if overflows
+      requestAnimationFrame(() => {
+        const rect = menu.getBoundingClientRect();
+        if (rect.right > window.innerWidth) menu.style.left = (window.innerWidth - rect.width - 8) + 'px';
+        if (rect.bottom > window.innerHeight) menu.style.top = (window.innerHeight - rect.height - 8) + 'px';
+      });
+    }
+
+    function hideCtxMenu() {
+      document.getElementById('ctx-menu').classList.remove('open');
+    }
+
+    function ctxAction(action) {
+      hideCtxMenu();
+      if (action === 'edit') editEvent(ctxDateStr, ctxEventId);
+      else if (action === 'copy') copyEvent(ctxDateStr, ctxEventId);
+      else if (action === 'delete') deleteEvent(ctxDateStr, ctxEventId);
+    }
+
+    document.addEventListener('click', hideCtxMenu);
+    document.addEventListener('contextmenu', function(e) {
+      if (!e.target.closest('.event-chip')) hideCtxMenu();
+    });
+
+    // ── Touch Swipe ──
+    let touchStartX = 0;
+    let touchStartY = 0;
+    const calGrid = document.getElementById('cal-grid');
+    calGrid.addEventListener('touchstart', e => {
+      touchStartX = e.touches[0].clientX;
+      touchStartY = e.touches[0].clientY;
+    }, { passive: true });
+    calGrid.addEventListener('touchend', e => {
+      const dx = e.changedTouches[0].clientX - touchStartX;
+      const dy = e.changedTouches[0].clientY - touchStartY;
+      if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy)) {
+        if (dx < 0) nextMonth();
+        else prevMonth();
+      }
+    }, { passive: true });
+
+    // ── Init ──
+    startListeners();
+    setTimeout(tryAutoLogin, 500);
+  </script>
+</body>
+</html>
