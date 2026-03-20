@@ -701,6 +701,7 @@
         <div style="display:flex;gap:6px;margin-bottom:16px">
           <button class="btn btn-secondary btn-sm admin-tab active" data-tab="backup" onclick="switchAdminTab('backup')">💾 バックアップ</button>
           <button class="btn btn-secondary btn-sm admin-tab" data-tab="log" onclick="switchAdminTab('log')">📋 編集履歴</button>
+          <button class="btn btn-secondary btn-sm admin-tab" data-tab="settings" onclick="switchAdminTab('settings')">🎨 設定</button>
         </div>
 
         <!-- Backup Tab -->
@@ -734,6 +735,12 @@
           <div class="log-load-more" id="log-load-more" style="display:none">
             <button class="btn btn-secondary btn-sm" onclick="loadMoreLogs()">さらに読み込む</button>
           </div>
+        </div>
+
+        <!-- Settings Tab -->
+        <div id="admin-tab-settings" class="admin-tab-content" style="display:none">
+          <h4 style="font-size:14px;margin:0 0 10px">🎨 背景色</h4>
+          <div id="bg-color-picker" style="display:flex;flex-wrap:wrap;gap:8px"></div>
         </div>
       </div>
     </div>
@@ -1874,6 +1881,9 @@
         document.getElementById('backup-import-status').innerHTML = '';
         loadAutoBackups();
       }
+      if (tab === 'settings') {
+        renderBgColorPicker();
+      }
     }
 
     async function openLogModal() { openAdminModal(); switchAdminTab('log'); }
@@ -2203,6 +2213,45 @@
     setInterval(runAutoBackup, AUTO_BACKUP_INTERVAL);
     // Run first backup 30 seconds after load
     setTimeout(runAutoBackup, 30000);
+
+    // ── Background Color Settings ──
+    const BG_COLORS = [
+      { name: 'デフォルト', color: '#F8FAFC' },
+      { name: '薄緑', color: '#F0F9F0' },
+      { name: '薄青', color: '#F0F4FF' },
+      { name: '薄黄', color: '#FEFCE8' },
+      { name: '薄橙', color: '#FFF7ED' },
+      { name: '薄紫', color: '#FAF5FF' },
+      { name: '薄桃', color: '#FFF1F2' },
+      { name: '薄灰', color: '#F1F5F9' },
+      { name: 'ホワイト', color: '#FFFFFF' },
+    ];
+
+    function initBgColor() {
+      const saved = localStorage.getItem('kd-bg-color');
+      if (saved) document.documentElement.style.setProperty('--bg', saved);
+    }
+
+    function renderBgColorPicker() {
+      const container = document.getElementById('bg-color-picker');
+      if (!container) return;
+      const current = getComputedStyle(document.documentElement).getPropertyValue('--bg').trim();
+      container.innerHTML = BG_COLORS.map(c => {
+        const isSelected = current === c.color;
+        return `<div onclick="setBgColor('${c.color}')" style="cursor:pointer;text-align:center">
+          <div style="width:48px;height:48px;border-radius:10px;background:${c.color};border:3px solid ${isSelected ? 'var(--accent)' : 'var(--border)'};margin-bottom:4px"></div>
+          <div style="font-size:10px;font-weight:600;color:${isSelected ? 'var(--accent)' : 'var(--text-muted)'}">${c.name}</div>
+        </div>`;
+      }).join('');
+    }
+
+    function setBgColor(color) {
+      document.documentElement.style.setProperty('--bg', color);
+      localStorage.setItem('kd-bg-color', color);
+      renderBgColorPicker();
+    }
+
+    initBgColor();
 
     // ── Context Menu ──
     let ctxDateStr = '';
