@@ -230,9 +230,10 @@
       border-left: 3px solid; white-space: nowrap; overflow: hidden;
       text-overflow: ellipsis; cursor: pointer;
       -webkit-user-select: none; user-select: none; -webkit-touch-callout: none;
+      position: relative; z-index: 2;
     }
     .event-chip.multi-bar {
-      position: relative; z-index: 1;
+      z-index: 1;
       border-left: 3px solid;
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
       overflow: visible;
@@ -241,7 +242,7 @@
     .event-chip.multi-bar.cont-end { border-radius: 0 4px 4px 0; border-left: none; }
     .event-chip.multi-bar.cont-mid { border-radius: 0; border-left: none; }
     .event-chip.multi-bar.cont-both { border-radius: 4px; }
-    .event-chip.placeholder { visibility: hidden; height: 20px; }
+    .event-chip.placeholder { visibility: hidden; z-index: 0; }
     .event-chip:hover { transform: scale(1.03); }
     .more-events { font-size: 11px; color: var(--text-muted); font-weight: 600; padding-left: 4px; }
 
@@ -488,7 +489,7 @@
         <button class="icon-btn" onclick="toggleSidebar()" aria-label="メニュー">
           <svg width="22" height="22" viewBox="0 0 22 22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6H19M3 11H19M3 16H19"/></svg>
         </button>
-        <h1>川内電機<span>予定表</span></h1><span style="font-size:10px;color:var(--text-muted);margin-left:6px">v1.00</span>
+        <h1>川内電機<span>予定表</span></h1><span style="font-size:10px;color:var(--text-muted);margin-left:6px">v1.01</span>
       </div>
       <div class="header-right">
         <div id="user-badge" class="user-badge"></div>
