@@ -430,6 +430,25 @@
 
     .empty-msg { color: var(--text-muted); font-size: 13px; text-align: center; padding: 20px; }
 
+    /* -- Quick Actions -- */
+    .quick-actions {
+      display: flex; gap: 6px; margin-bottom: 12px; flex-wrap: wrap;
+    }
+    .quick-action-btn {
+      flex: 1; min-width: 0;
+      padding: 10px 8px; border-radius: 10px;
+      font-size: 11px; font-weight: 700; font-family: inherit;
+      border: 1.5px solid; cursor: pointer;
+      display: flex; flex-direction: column; align-items: center;
+      gap: 3px; transition: all 0.15s;
+      text-decoration: none;
+    }
+    .quick-action-btn:hover { transform: translateY(-1px); box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+    .quick-action-btn .qa-icon { font-size: 18px; }
+    .qa-daily { background: #E8F0FE; border-color: #4285F4; color: #1A56DB; }
+    .qa-stay { background: #E0F7FA; border-color: #0D9488; color: #065F56; }
+    .qa-report { background: #FEF3E2; border-color: #F5A623; color: #92600A; }
+
     /* ── Mobile ── */
     @media (max-width: 768px) {
       :root { --cell-gap: 3px; }
@@ -1080,6 +1099,24 @@
 
     const APP_PASSCODE = '935987';
 
+    // -- 連携URL --
+    const DAILY_REPORT_URL = 'https://script.google.com/macros/s/AKfycbwSXF5Dt-QHdjC3YCm0NgiAst4dbWSWQ3aYx-lOyRLTcpRSJx4HM_j44Gw6UT6_71g/exec';
+    const SERVICE_REPORT_URL = 'https://script.google.com/macros/s/AKfycbx0yHICblAyz6iYjs9hL3JrFTwzMk2I1Nqn7UvMgR6nuYrht8XZc9rcSk3mZ_FORswJ/exec';
+
+    function openReportApp(type, dateStr) {
+      const staff = currentMember ? currentMember.name : '';
+      let url = '';
+      if (type === 'daily') {
+        url = DAILY_REPORT_URL + '?date=' + dateStr + '&staff=' + encodeURIComponent(staff) + '&mode=daily';
+      } else if (type === 'trip') {
+        url = DAILY_REPORT_URL + '?date=' + dateStr + '&staff=' + encodeURIComponent(staff) + '&mode=trip';
+      } else if (type === 'report') {
+        url = SERVICE_REPORT_URL + '?date=' + dateStr + '&staff=' + encodeURIComponent(staff);
+      }
+      if (url) { window.open(url, '_blank'); }
+      else { alert('アプリURLが設定されていません。'); }
+    }
+
     async function handleLogin() {
       const name = document.getElementById('login-name').value.trim();
       const pass = document.getElementById('login-pass').value.trim();
@@ -1407,13 +1444,7 @@
 
     function onDayClick(dateStr) {
       selectedDate = dateStr;
-      const dayEvents = getFilteredEvents(dateStr);
-      if (dayEvents.length > 0) {
-        openDayModal(dateStr);
-      } else if (members.length > 0) {
-        editingEventId = null;
-        openEventModal(dateStr);
-      }
+      openDayModal(dateStr);
     }
 
     // ── Day Detail Modal ──
@@ -1427,6 +1458,19 @@
 
       const dayEvents = getFilteredEvents(dateStr);
       let html = '';
+
+      // Quick action buttons
+      html += `<div class="quick-actions">
+        <button class="quick-action-btn qa-daily" onclick="closeDayModal();openReportApp('daily','${dateStr}')">
+          <span class="qa-icon">📋</span>出勤簿
+        </button>
+        <button class="quick-action-btn qa-stay" onclick="closeDayModal();openReportApp('trip','${dateStr}')">
+          <span class="qa-icon">🚄</span>出張日報
+        </button>
+        <button class="quick-action-btn qa-report" onclick="closeDayModal();openReportApp('report','${dateStr}')">
+          <span class="qa-icon">🔧</span>サービスレポート
+        </button>
+      </div>`;
 
       // Bulk bar
       html += `<div class="bulk-bar" id="bulk-bar">
