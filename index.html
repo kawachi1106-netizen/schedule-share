@@ -538,6 +538,10 @@
           </div>
           <div class="month-nav-right">
             <button class="btn btn-secondary btn-sm" onclick="goToday()">今日</button>
+            <button class="btn btn-secondary btn-sm btn-icon" onclick="exportExcel()" title="表示中の月・メンバーをExcel出力">
+              <svg class="hide-mobile" width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 2H9L12 5V12H2Z"/><path d="M5 6L9 10M9 6L5 10"/></svg>
+              Excel
+            </button>
             <button id="add-event-btn" class="btn btn-primary btn-sm btn-icon" onclick="openAddEvent()">
               <svg class="hide-mobile" width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M7 3V11M3 7H11"/></svg>
               予定追加
@@ -1315,6 +1319,197 @@
       currentYear = t.getFullYear();
       currentMonth = t.getMonth();
       renderCalendar();
+    }
+
+    // ── Excel出力（表示中の月・選択メンバーをGUI風カレンダーで出力）──
+    const EXCELJS_URL = "https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js";
+    function loadExcelJS() {
+      return new Promise((resolve, reject) => {
+        if (window.ExcelJS) return resolve();
+        const s = document.createElement('script');
+        s.src = EXCELJS_URL;
+        s.onload = () => resolve();
+        s.onerror = () => reject(new Error('Excelライブラリの読み込みに失敗しました（ネット接続をご確認ください）'));
+        document.head.appendChild(s);
+      });
+    }
+    function hexToArgb(hex) { return 'FF' + (hex || '#000000').replace('#', '').toUpperCase(); }
+
+    // 1週間分（7列）のイベントをレーン割り当て（renderCalendarのロジックを踏襲）
+    function buildWeekLanes(weekDates) {
+      const present = weekDates.filter(Boolean);
+      if (present.length === 0) return { placed: [], laneCount: 0 };
+      const firstDate = present[0], lastDate = present[present.length - 1];
+      const lanes = [];
+      const assign = (colStart, colEnd) => {
+        let lane = 0;
+        while (true) {
+          if (!lanes[lane]) lanes[lane] = [];
+          const conflict = lanes[lane].some(x => !(colStart > x.colEnd || colEnd < x.colStart));
+          if (!conflict) { lanes[lane].push({ colStart, colEnd }); return lane; }
+          lane++;
+        }
+      };
+      const placed = [];
+      // 複数日イベント（バー）を先に上のレーンへ
+      const seen = new Set();
+      for (let c = 0; c < 7; c++) {
+        const dt = weekDates[c];
+        if (!dt || !events[dt]) continue;
+        events[dt].forEach(ev => {
+          if (seen.has(ev.id)) return;
+          if (!filterSet.has(ev.memberId)) return;
+          const ds = ev.dateStart || ev.date, de = ev.dateEnd || ev.date;
+          if (ds === de) return;
+          if (de < firstDate || ds > lastDate) return;
+          seen.add(ev.id);
+          let colStart = 0, colEnd = 6;
+          for (let i = 0; i < 7; i++) { if (weekDates[i] && weekDates[i] >= ds) { colStart = i; break; } }
+          for (let i = 6; i >= 0; i--) { if (weekDates[i] && weekDates[i] <= de) { colEnd = i; break; } }
+          placed.push({ lane: assign(colStart, colEnd), colStart, colEnd, ev });
+        });
+      }
+      // 単日イベント
+      for (let c = 0; c < 7; c++) {
+        const dt = weekDates[c];
+        if (!dt) continue;
+        getFilteredEvents(dt).filter(ev => {
+          const ds = ev.dateStart || ev.date, de = ev.dateEnd || ev.date;
+          return ds === de;
+        }).forEach(ev => {
+          placed.push({ lane: assign(c, c), colStart: c, colEnd: c, ev });
+        });
+      }
+      return { placed, laneCount: lanes.length };
+    }
+
+    async function exportExcel() {
+      if (filterSet.size === 0) { alert('表示するメンバーが選択されていません。サイドバーでメンバーにチェックを入れてください。'); return; }
+      try {
+        await loadExcelJS();
+        const ExcelJS = window.ExcelJS;
+        const wb = new ExcelJS.Workbook();
+        const ws = wb.addWorksheet(`${currentYear}年${currentMonth + 1}月`, {
+          views: [{ showGridLines: false }],
+          pageSetup: { orientation: 'landscape', fitToPage: true, fitToWidth: 1, fitToHeight: 0, margins: { left: 0.3, right: 0.3, top: 0.4, bottom: 0.4, header: 0.2, footer: 0.2 } }
+        });
+
+        for (let c = 1; c <= 7; c++) ws.getColumn(c).width = 19;
+
+        const selectedMembers = members.filter(m => filterSet.has(m.id));
+        const border = { top: { style: 'thin', color: { argb: 'FFD9E1EC' } }, left: { style: 'thin', color: { argb: 'FFD9E1EC' } }, bottom: { style: 'thin', color: { argb: 'FFD9E1EC' } }, right: { style: 'thin', color: { argb: 'FFD9E1EC' } } };
+
+        let r = 1;
+        // タイトル
+        ws.mergeCells(r, 1, r, 7);
+        const titleCell = ws.getCell(r, 1);
+        titleCell.value = `${currentYear}年 ${currentMonth + 1}月  予定表`;
+        titleCell.font = { name: 'Yu Gothic', size: 16, bold: true, color: { argb: 'FF1E293B' } };
+        titleCell.alignment = { horizontal: 'center', vertical: 'middle' };
+        ws.getRow(r).height = 28;
+        r++;
+
+        // 凡例（メンバー名を各自の色で）
+        ws.mergeCells(r, 1, r, 7);
+        const legendCell = ws.getCell(r, 1);
+        const runs = [{ text: '凡例:  ', font: { name: 'Yu Gothic', size: 10, bold: true, color: { argb: 'FF64748B' } } }];
+        selectedMembers.forEach(m => {
+          const col = getMemberColor(m.id);
+          runs.push({ text: '■' + m.name + '   ', font: { name: 'Yu Gothic', size: 10, bold: true, color: { argb: hexToArgb(col.border) } } });
+        });
+        legendCell.value = { richText: runs };
+        legendCell.alignment = { horizontal: 'left', vertical: 'middle', wrapText: true };
+        ws.getRow(r).height = 20;
+        r++;
+
+        // 曜日ヘッダ
+        const headRow = r;
+        DAYS_JP.forEach((d, i) => {
+          const cell = ws.getCell(headRow, i + 1);
+          cell.value = d;
+          cell.alignment = { horizontal: 'center', vertical: 'middle' };
+          cell.font = { name: 'Yu Gothic', size: 11, bold: true, color: { argb: i === 0 ? 'FFC53030' : i === 6 ? 'FF1A56DB' : 'FF475569' } };
+          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF1F5F9' } };
+          cell.border = border;
+        });
+        ws.getRow(headRow).height = 20;
+        r++;
+
+        // カレンダー本体
+        const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+        const firstDay = new Date(currentYear, currentMonth, 1).getDay();
+        const weeks = Math.ceil((firstDay + daysInMonth) / 7);
+        const today = todayStr();
+
+        for (let w = 0; w < weeks; w++) {
+          const weekDates = [];
+          for (let c = 0; c < 7; c++) {
+            const d = w * 7 + c - firstDay + 1;
+            weekDates.push((d < 1 || d > daysInMonth) ? null : formatDate(currentYear, currentMonth, d));
+          }
+
+          // 日付行
+          const dayRow = r;
+          for (let c = 0; c < 7; c++) {
+            const cell = ws.getCell(dayRow, c + 1);
+            const dt = weekDates[c];
+            cell.border = border;
+            cell.alignment = { horizontal: 'left', vertical: 'middle', wrapText: true };
+            if (!dt) { cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF8FAFC' } }; continue; }
+            const day = parseDate(dt).day;
+            const holiday = getHolidayName(dt);
+            const isSun = c === 0 || !!holiday;
+            const numColor = isSun ? 'FFC53030' : c === 6 ? 'FF1A56DB' : 'FF1E293B';
+            const dayRuns = [{ text: String(day), font: { name: 'Yu Gothic', size: 12, bold: true, color: { argb: numColor } } }];
+            if (holiday) dayRuns.push({ text: '  ' + holiday, font: { name: 'Yu Gothic', size: 9, color: { argb: 'FFC53030' } } });
+            cell.value = { richText: dayRuns };
+            if (dt === today) cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFBEB' } };
+          }
+          ws.getRow(dayRow).height = 18;
+          r++;
+
+          // イベント行
+          const { placed, laneCount } = buildWeekLanes(weekDates);
+          const laneRows = Math.max(laneCount, 1);
+          const baseRow = r;
+          // 枠線（空セル含む）
+          for (let lane = 0; lane < laneRows; lane++) {
+            ws.getRow(baseRow + lane).height = 20;
+            for (let c = 0; c < 7; c++) {
+              const cell = ws.getCell(baseRow + lane, c + 1);
+              cell.border = border;
+              if (!weekDates[c]) cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF8FAFC' } };
+            }
+          }
+          // イベントチップ
+          placed.forEach(item => {
+            const row = baseRow + item.lane;
+            const col = getMemberColor(item.ev.memberId);
+            const label = item.ev.customer || item.ev.title || '予定';
+            if (item.colEnd > item.colStart) ws.mergeCells(row, item.colStart + 1, row, item.colEnd + 1);
+            const cell = ws.getCell(row, item.colStart + 1);
+            cell.value = label;
+            cell.font = { name: 'Yu Gothic', size: 10, bold: true, color: { argb: hexToArgb(col.text) } };
+            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: hexToArgb(col.bg) } };
+            cell.alignment = { horizontal: 'left', vertical: 'middle', wrapText: true };
+            cell.border = { ...border, left: { style: 'medium', color: { argb: hexToArgb(col.border) } } };
+          });
+          r += laneRows;
+        }
+
+        const buf = await wb.xlsx.writeBuffer();
+        const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        const mm = String(currentMonth + 1).padStart(2, '0');
+        const nameTag = selectedMembers.length <= 3 ? '_' + selectedMembers.map(m => m.name).join('・') : '';
+        a.href = url;
+        a.download = `予定表_${currentYear}-${mm}${nameTag}.xlsx`;
+        a.click();
+        URL.revokeObjectURL(url);
+      } catch (err) {
+        alert('Excel出力に失敗しました: ' + err.message);
+      }
     }
 
     function onDayClick(dateStr) {
