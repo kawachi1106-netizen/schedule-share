@@ -406,6 +406,13 @@
     .log-meta { font-size: 11px; color: var(--text-muted); margin-top: 3px; }
     .day-history { margin-bottom: 12px; padding: 10px; border: 1px solid var(--border); border-radius: 10px; max-height: 320px; overflow-y: auto; }
     .day-history-title { font-size: 12px; font-weight: 700; color: var(--text-secondary); margin-bottom: 8px; }
+    .app-version { background: none; border: none; padding: 2px 4px; margin-left: 4px; font-size: 10px; color: var(--text-muted); cursor: pointer; border-radius: 4px; font-family: inherit; display: inline-flex; align-items: center; gap: 4px; }
+    .app-version:hover { background: var(--border-light); }
+    .app-version-new { background: var(--danger); color: #fff; font-size: 9px; font-weight: 700; padding: 1px 5px; border-radius: 8px; }
+    .whats-new-ver { font-size: 14px; font-weight: 700; color: var(--text-primary); margin: 14px 0 6px; }
+    .whats-new-ver:first-child { margin-top: 0; }
+    .whats-new-ver span { font-size: 11px; font-weight: 400; color: var(--text-muted); margin-left: 6px; }
+    .whats-new-list { margin: 0; padding-left: 20px; font-size: 13px; color: var(--text-secondary); line-height: 1.7; }
     .startup-view-info { font-size: 11px; color: var(--text-muted); margin-top: 4px; line-height: 1.5; }
     .startup-view-info a { color: var(--accent); cursor: pointer; text-decoration: underline; margin-left: 4px; }
     .history-details { font-size: 11px; color: var(--text-secondary); margin-top: 3px; line-height: 1.6; }
@@ -513,7 +520,7 @@
         <button class="icon-btn" onclick="toggleSidebar()" aria-label="メニュー">
           <svg width="22" height="22" viewBox="0 0 22 22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6H19M3 11H19M3 16H19"/></svg>
         </button>
-        <h1>川内電機<span>予定表</span></h1><span style="font-size:10px;color:var(--text-muted);margin-left:6px">v1.4</span>
+        <h1>川内電機<span>予定表</span></h1><button id="app-version" class="app-version" onclick="openWhatsNew(true)" title="更新履歴"><span id="app-version-text"></span><span id="app-version-new" class="app-version-new hidden">NEW</span></button>
       </div>
       <div class="header-right">
         <div id="user-badge" class="user-badge"></div>
@@ -619,6 +626,22 @@
           </div>
           <button class="btn btn-primary btn-full" onclick="handleLogin()">ログイン</button>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- What's New Modal -->
+  <div id="whats-new-modal" class="modal-overlay" onclick="closeWhatsNew()">
+    <div class="modal" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <h3 id="whats-new-title">お知らせ</h3>
+        <button class="icon-btn" onclick="closeWhatsNew()">
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 4L14 14M14 4L4 14"/></svg>
+        </button>
+      </div>
+      <div class="modal-body">
+        <div id="whats-new-body"></div>
+        <button class="btn btn-primary btn-full" style="margin-top:16px" onclick="closeWhatsNew()">閉じる</button>
       </div>
     </div>
   </div>
@@ -1112,6 +1135,61 @@
       return new Set(members.map(m => m.id));
     }
 
+    // ── バージョンと更新履歴（更新のたびに先頭へ追加） ──
+    const APP_VERSION = '1.5';
+    const CHANGELOG = [
+      { version: '1.5', date: '2026-10-26', items: ["アプリの更新内容を、更新後の最初の起動時に「お知らせ」で表示するようになりました。", "ヘッダーのバージョン表記（v1.5）を押すと、これまでの更新履歴をいつでも見られます。"] },
+      { version: '1.4', date: '2026-10-26', items: ["起動時に表示するメンバーを、自分で設定できるようになりました。", "サイドバーで表示したい人にチェックを入れて「★ 起動時の表示に保存」を押してください。解除するとこれまでの表示に戻ります。"] },
+      { version: '1.3', date: '2026-10-26', items: ["日付を開いた画面に「🕘 編集履歴」ボタンを追加しました。", "その日の予定を、誰が・誰の予定を・いつ追加／編集／削除したかと、変更前→変更後が見られます。", "予定が無い日は、予定追加の画面の右上「🕘 履歴」から見られます。", "ダイヘン本体で川内・小川の予定が変更された分も【ダイヘン】付きで表示します。"] },
+      { version: '1.2', date: '2026-10-26', items: ["複数日の予定が、ほかの予定と重なって表示される不具合を直しました。", "月の最初の週で、前月から続く予定が名前の無い細い線になる不具合を直しました。"] },
+    ];
+    const SEEN_VERSION_KEY = 'kd-seen-version';
+
+    function compareVersion(a, b) {
+      const pa = String(a).split('.').map(Number), pb = String(b).split('.').map(Number);
+      for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+        const d = (pa[i] || 0) - (pb[i] || 0);
+        if (d) return d;
+      }
+      return 0;
+    }
+    function getSeenVersion() {
+      try { return localStorage.getItem(SEEN_VERSION_KEY) || ''; } catch (e) { return ''; }
+    }
+    function unseenChangelog() {
+      const seen = getSeenVersion();
+      return seen ? CHANGELOG.filter(c => compareVersion(c.version, seen) > 0) : CHANGELOG;
+    }
+    function renderVersionLabel() {
+      document.getElementById('app-version-text').textContent = 'v' + APP_VERSION;
+      document.getElementById('app-version-new').classList.toggle('hidden', unseenChangelog().length === 0);
+    }
+
+    let whatsNewChecked = false;
+    function showWhatsNewIfNeeded() {
+      renderVersionLabel();
+      if (whatsNewChecked) return;
+      whatsNewChecked = true;
+      if (unseenChangelog().length > 0) openWhatsNew(false);
+    }
+
+    // showAll=true: バージョン表記から開いたとき（全履歴）
+    function openWhatsNew(showAll) {
+      const list = showAll ? CHANGELOG : unseenChangelog();
+      document.getElementById('whats-new-title').textContent = showAll ? '更新履歴' : `🆕 お知らせ（v${APP_VERSION}）`;
+      document.getElementById('whats-new-body').innerHTML = list.map(c =>
+        `<div class="whats-new-ver">v${c.version}<span>${c.date.replace(/-/g, '/')}</span></div>`
+        + `<ul class="whats-new-list">${c.items.map(t => `<li>${t}</li>`).join('')}</ul>`
+      ).join('');
+      document.getElementById('whats-new-modal').classList.add('open');
+    }
+
+    function closeWhatsNew() {
+      document.getElementById('whats-new-modal').classList.remove('open');
+      try { localStorage.setItem(SEEN_VERSION_KEY, APP_VERSION); } catch (e) {}
+      renderVersionLabel();
+    }
+
     const APP_PASSCODE = '935987';
 
     // -- 連携URL --
@@ -1204,6 +1282,7 @@
       renderMemberList();
       renderCalendar();
       updateViewingIndicator();
+      showWhatsNewIfNeeded();
     }
 
     function updateUserBadge() {
