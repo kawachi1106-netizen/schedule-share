@@ -508,7 +508,7 @@
         <button class="icon-btn" onclick="toggleSidebar()" aria-label="メニュー">
           <svg width="22" height="22" viewBox="0 0 22 22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6H19M3 11H19M3 16H19"/></svg>
         </button>
-        <h1>川内電機<span>予定表</span></h1><span style="font-size:10px;color:var(--text-muted);margin-left:6px">v1.01</span>
+        <h1>川内電機<span>予定表</span></h1><span style="font-size:10px;color:var(--text-muted);margin-left:6px">v1.2</span>
       </div>
       <div class="header-right">
         <div id="user-badge" class="user-badge"></div>
@@ -1362,7 +1362,9 @@
           html += '<div class="cal-events">';
 
           // Multi-day bar slots for this column
-          for (let lane = 0; lane < laneCount; lane++) {
+          // 空きレーンもスペーサーで埋め、下のレーンのバーと単日予定が重ならないようにする
+          const lastLane = multiItems.reduce((mx, m) => (col >= m.colStart && col <= m.colEnd) ? Math.max(mx, m.lane) : mx, -1);
+          for (let lane = 0; lane <= lastLane; lane++) {
             const item = multiItems.find(m => m.lane === lane && m.colStart === col);
             const occupied = multiItems.find(m => m.lane === lane && col > m.colStart && col <= m.colEnd);
             if (item) {
@@ -1374,8 +1376,8 @@
               else if (!item.isStart) cls = 'cont-end';
               else if (!item.isEnd) cls = 'cont-start';
               const w = `calc(${span} * 100% + ${(span - 1) * (1 + cellGap)}px)`;
-              html += `<div class="event-chip multi-bar ${cls}" style="width:${w};background:${c.bg};color:${c.text};border-left-color:${c.border}" onclick="event.stopPropagation();onDayClick('${item.ev.dateStart || item.ev.date}')" oncontextmenu="showCtxMenu(event,'${item.ev.dateStart || item.ev.date}','${item.ev.id}')" title="${label}">${item.isStart || col === 0 ? label : ''}</div>`;
-            } else if (occupied) {
+              html += `<div class="event-chip multi-bar ${cls}" style="width:${w};background:${c.bg};color:${c.text};border-left-color:${c.border}" onclick="event.stopPropagation();onDayClick('${item.ev.dateStart || item.ev.date}')" oncontextmenu="showCtxMenu(event,'${item.ev.dateStart || item.ev.date}','${item.ev.id}')" title="${label}">${label}</div>`;
+            } else {
               html += '<div class="event-chip placeholder">.</div>';
             }
           }
