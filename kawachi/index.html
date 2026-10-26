@@ -404,6 +404,9 @@
     .log-item.log-delete { background: var(--danger-bg); border-left-color: var(--danger); }
     .log-item.log-member { background: #EFF6FF; border-left-color: #2563EB; }
     .log-meta { font-size: 11px; color: var(--text-muted); margin-top: 3px; }
+    .day-history { margin-bottom: 12px; padding: 10px; border: 1px solid var(--border); border-radius: 10px; max-height: 320px; overflow-y: auto; }
+    .day-history-title { font-size: 12px; font-weight: 700; color: var(--text-secondary); margin-bottom: 8px; }
+    .history-details { font-size: 11px; color: var(--text-secondary); margin-top: 3px; line-height: 1.6; }
     .log-load-more { text-align: center; margin-top: 8px; }
 
     /* ── Member Management ── */
@@ -508,7 +511,7 @@
         <button class="icon-btn" onclick="toggleSidebar()" aria-label="メニュー">
           <svg width="22" height="22" viewBox="0 0 22 22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6H19M3 11H19M3 16H19"/></svg>
         </button>
-        <h1>川内電機<span>予定表</span></h1><span style="font-size:10px;color:var(--text-muted);margin-left:6px">v1.2</span>
+        <h1>川内電機<span>予定表</span></h1><span style="font-size:10px;color:var(--text-muted);margin-left:6px">v1.3</span>
       </div>
       <div class="header-right">
         <div id="user-badge" class="user-badge"></div>
@@ -632,9 +635,12 @@
     <div class="modal" onclick="event.stopPropagation()">
       <div class="modal-header">
         <h3 id="event-modal-title">予定を追加</h3>
-        <button class="icon-btn" onclick="closeEventModal()">
-          <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 4L14 14M14 4L4 14"/></svg>
-        </button>
+        <div style="display:flex;align-items:center;gap:6px">
+          <button class="btn btn-secondary btn-sm" onclick="openHistoryFromEventModal()" title="この日の編集履歴">🕘 履歴</button>
+          <button class="icon-btn" onclick="closeEventModal()">
+            <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 4L14 14M14 4L4 14"/></svg>
+          </button>
+        </div>
       </div>
       <div class="modal-body">
         <div class="form-group">
@@ -1476,12 +1482,16 @@
 
       // Bulk bar
       html += `<div class="bulk-bar" id="bulk-bar">
-        <button class="btn btn-secondary btn-sm" onclick="toggleBulkMode('${dateStr}')">☑ 選択削除モード</button>
+        <div style="display:flex;gap:6px">
+          <button class="btn btn-secondary btn-sm" onclick="toggleBulkMode('${dateStr}')">☑ 選択削除モード</button>
+          <button class="btn btn-secondary btn-sm" onclick="toggleDayHistory('${dateStr}')">🕘 編集履歴</button>
+        </div>
         <div style="display:flex;gap:6px" id="bulk-actions" class="hidden">
           <button class="btn btn-secondary btn-sm" onclick="bulkSelectAll('${dateStr}')">全選択</button>
           <button class="btn btn-primary btn-sm" style="background:var(--danger);border-color:var(--danger)" onclick="bulkDelete('${dateStr}')">🗑 選択削除</button>
         </div>
-      </div>`;
+      </div>
+      <div id="day-history" class="day-history hidden"></div>`;
 
       dayEvents.forEach(ev => {
         const c = getMemberColor(ev.memberId);
@@ -1554,7 +1564,7 @@
           await db.collection('kd-events').doc(evId).delete();
           if (ev) {
             const member = getMember(ev.memberId);
-            await writeLog('delete', `${member?.name || '不明'}の「${ev.title}」を削除`, dateStr);
+            await writeLog('delete', `${member?.name || '不明'}の「${ev.customer || ev.title}」を削除`, dateStr, logDeleteExtra(ev, member?.name || '不明'));
           }
         }
         const dayModal = document.getElementById('day-modal');
@@ -1741,6 +1751,7 @@
 
       try {
         if (editingEventId) {
+          const before = allEventsRaw[editingEventId] || null;
           await db.collection('kd-events').doc(editingEventId).delete();
           for (const memberId of memberIds) {
             await db.collection('kd-events').add({
@@ -1750,7 +1761,12 @@
           }
           const mNames = memberIds.map(id => getMember(id)?.name || '不明').join(',');
           const days = getDateRange(dateStart, dateEnd).length;
-          await writeLog('edit', `${mNames}の「${customer || title}」を編集${days > 1 ? `（${days}日間）` : ''}`, dateStart);
+          const beforeName = before ? (getMember(before.memberId)?.name || '不明') : '';
+          await writeLog('edit', `${mNames}の「${customer || title}」を編集${days > 1 ? `（${days}日間）` : ''}`, dateStart, {
+            targets: [...new Set([beforeName, ...memberIds.map(id => getMember(id)?.name || '不明')].filter(Boolean))],
+            dates: [...new Set([...(before ? evDates(before) : []), ...evDates(baseData)])],
+            details: before ? evDiff(before, baseData, beforeName, mNames) : [],
+          });
         } else {
           for (const memberId of memberIds) {
             await db.collection('kd-events').add({
@@ -1759,7 +1775,7 @@
             });
             const mName = getMember(memberId)?.name || '不明';
             const days = getDateRange(dateStart, dateEnd).length;
-            await writeLog('add', `${mName}の「${customer || title}」を追加${days > 1 ? `（${days}日間）` : ''}`, dateStart);
+            await writeLog('add', `${mName}の「${customer || title}」を追加${days > 1 ? `（${days}日間）` : ''}`, dateStart, { targets: [mName], dates: evDates(baseData), details: evSnapshot(baseData) });
           }
         }
         closeEventModal();
@@ -1775,7 +1791,7 @@
         await db.collection('kd-events').doc(eventId).delete();
         if (ev) {
           const member = getMember(ev.memberId);
-          await writeLog('delete', `${member?.name || '不明'}の「${ev.title}」を削除`, dateStr);
+          await writeLog('delete', `${member?.name || '不明'}の「${ev.customer || ev.title}」を削除`, dateStr, logDeleteExtra(ev, member?.name || '不明'));
         }
         const dayModal = document.getElementById('day-modal');
         if (dayModal.classList.contains('open')) {
@@ -1911,18 +1927,115 @@
     }
 
     // ── Edit Log ──
-    async function writeLog(type, message, date) {
+    async function writeLog(type, message, date, extra) {
       try {
         await db.collection('kd-logs').add({
           type, // 'add', 'edit', 'delete', 'member'
           message,
           date: date || null,
+          ...(extra || {}), // targets / dates / details（v1.3〜）
           user: currentMember?.name || '不明',
           timestamp: firebase.firestore.FieldValue.serverTimestamp(),
         });
       } catch (err) {
         console.error('Log write error:', err);
       }
+    }
+
+    // ── 日別の編集履歴 ──
+    function escHtml(s) {
+      return String(s ?? '').replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+    }
+    function evRange(ev) {
+      const ds = ev.dateStart || ev.date;
+      const de = ev.dateEnd || ev.date || ds;
+      return { ds, de: de < ds ? ds : de };
+    }
+    function evPeriodText(ev) { const { ds, de } = evRange(ev); return ds === de ? ds : `${ds}〜${de}`; }
+    function evTimeText(ev) { return ev.allDay ? '終日' : `${ev.startTime || ''}〜${ev.endTime || ''}`; }
+    function evDates(ev) { const { ds, de } = evRange(ev); return getDateRange(ds, de); }
+    // 追加・削除時に残す予定の内容
+    function evSnapshot(ev) {
+      const d = [];
+      if (ev.customer) d.push(`客先: ${ev.customer}`);
+      d.push(`内容: ${ev.title || '（なし）'}`);
+      d.push(`期間: ${evPeriodText(ev)}`);
+      d.push(`時間: ${evTimeText(ev)}`);
+      if (ev.memo) d.push(`メモ: ${ev.memo}`);
+      return d;
+    }
+    // 編集時の変更前→変更後
+    function evDiff(before, after, beforeNames, afterNames) {
+      const d = [];
+      const cmp = (label, a, b) => { if ((a || '') !== (b || '')) d.push(`${label}: ${a || '（なし）'} → ${b || '（なし）'}`); };
+      cmp('担当', beforeNames, afterNames);
+      cmp('客先', before.customer, after.customer);
+      cmp('内容', before.title, after.title);
+      cmp('期間', evPeriodText(before), evPeriodText(after));
+      cmp('時間', evTimeText(before), evTimeText(after));
+      cmp('メモ', before.memo, after.memo);
+      return d.length ? d : ['内容の変更なし'];
+    }
+    function logDeleteExtra(ev, name) {
+      return { targets: [name], dates: evDates(ev), details: evSnapshot(ev) };
+    }
+
+    async function fetchDayLogs(colName, dateStr) {
+      const col = db.collection(colName);
+      // dates: v1.3以降の記録（期間中の全日）／date: それ以前の記録（開始日のみ）
+      const [byDates, byDate] = await Promise.all([
+        col.where('dates', 'array-contains', dateStr).get(),
+        col.where('date', '==', dateStr).get(),
+      ]);
+      const map = new Map();
+      [...byDates.docs, ...byDate.docs].forEach(d => map.set(d.id, d.data()));
+      return [...map.values()].filter(x => x.type === 'add' || x.type === 'edit' || x.type === 'delete');
+    }
+
+    function formatLogTime(ts) {
+      const t = ts?.toDate ? ts.toDate() : null;
+      if (!t) return '';
+      return `${t.getFullYear()}年${t.getMonth() + 1}月${t.getDate()}日 ${String(t.getHours()).padStart(2, '0')}:${String(t.getMinutes()).padStart(2, '0')}`;
+    }
+
+    async function toggleDayHistory(dateStr) {
+      const box = document.getElementById('day-history');
+      if (!box) return;
+      if (!box.classList.contains('hidden')) { box.classList.add('hidden'); return; }
+      box.classList.remove('hidden');
+      box.innerHTML = '<p class="empty-msg">読み込み中...</p>';
+      try {
+        const own = await fetchDayLogs('kd-logs', dateStr);
+        // ダイヘン本体から同期している川内・小川の予定の履歴
+        const main = (await fetchDayLogs('logs', dateStr)).filter(x => {
+          const who = x.targets || (x.message || '').split('の「')[0].split(',');
+          return who.some(n => SYNC_MEMBER_NAMES.includes(n));
+        }).map(x => ({ ...x, _src: 'ダイヘン' }));
+        const items = [...own, ...main];
+        const ms = x => x.timestamp?.toMillis?.() ?? Date.now();
+        items.sort((a, b) => ms(b) - ms(a));
+        let html = '<div class="day-history-title">この日の編集履歴</div>';
+        if (items.length === 0) html += '<p class="empty-msg">この日の編集履歴はありません</p>';
+        items.forEach(x => {
+          const cls = x.type === 'add' ? 'log-add' : x.type === 'edit' ? 'log-edit' : 'log-delete';
+          const icon = x.type === 'add' ? '➕' : x.type === 'edit' ? '✏️' : '🗑️';
+          const details = (x.details || []).map(escHtml).join('<br>');
+          html += `<div class="log-item ${cls}">${icon} ${x._src ? `【${x._src}】` : ''}<b>${escHtml(x.user || '不明')}</b>が${escHtml(x.message)}`
+            + (details ? `<div class="history-details">${details}</div>` : '')
+            + `<div class="log-meta">${formatLogTime(x.timestamp)}</div></div>`;
+        });
+        box.innerHTML = html;
+      } catch (err) {
+        console.error('Day history error:', err);
+        box.innerHTML = '<p class="empty-msg">履歴の読み込みに失敗しました</p>';
+      }
+    }
+
+    function openHistoryFromEventModal() {
+      const dateStr = document.getElementById('ev-date').value || selectedDate;
+      closeEventModal();
+      openDayModal(dateStr);
+      toggleDayHistory(dateStr);
     }
 
     let logLastDoc = null;
